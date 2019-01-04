@@ -6,7 +6,7 @@
 #include <cstdlib>
 
 #include <pcap.h>
-#include "common.h"
+#include "arpspf.h"
 
 int main(int argc, char* argv[]) {
     char errbuf[1024] = {0};

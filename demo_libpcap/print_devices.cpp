@@ -9,7 +9,7 @@
 #include <cassert>
 
 #include <iostream>
-#include "common.h"
+#include "arpspf.h"
 
 
 int main(int argc, char* argv[]) {
@@ -32,10 +32,10 @@ int main(int argc, char* argv[]) {
 
         auto pa = dev->addresses;
         while (pa != nullptr) {
-            std::cout << "\n\tAddress: " << to_string_null(pa->addr)
-                      << "\n\tNetmask: " << to_string_null(pa->netmask)
-                      << "\n\tBroadcast: " << to_string_null(pa->broadaddr)
-                      << "\n\tDestination: " << to_string_null(pa->dstaddr)
+            std::cout << "\n\tAddress: " << get_address_string(pa->addr)
+                      << "\n\tNetmask: " << get_address_string(pa->netmask)
+                      << "\n\tBroadcast: " << get_address_string(pa->broadaddr)
+                      << "\n\tDestination: " << get_address_string(pa->dstaddr)
                       << "\n";
             pa = pa->next;
         }

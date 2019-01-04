@@ -1,4 +1,4 @@
-# https://github.com/bro/cmake/blob/master/FindPCAP.cmake
+# https://github.com/bro/c make/blob/master/FindPCAP.cmake
 
 # - Try to find libpcap include dirs and libraries
 #

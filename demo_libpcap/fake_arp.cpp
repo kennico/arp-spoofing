@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "common.h"
+#include "arpspf.h"
 
 
 
@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     ether_hdr etherHdr{};
     memcpy(etherHdr.src_addr, src_mac, 6);
     memcpy(etherHdr.dst_addr, dst_mac, 6);
-    etherHdr.type = htons(ETHERNET_TYPE);
+    etherHdr.type = htons(ETHERTYPE_ARP);
 
     arp_hdr arpHdr{};
     arpHdr.htype = htons(ARP_HTYPE_ETHERNET);
