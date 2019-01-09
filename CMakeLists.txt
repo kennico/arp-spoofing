@@ -29,22 +29,6 @@ set(COMMON_SOURCE
 add_executable(arpspf src/main.cpp ${COMMON_SOURCE} src/arpspf.cpp)
 target_link_libraries(arpspf ${PCAP_LIBRARY})
 
-
-
-
-
-add_executable(get_packet demo_libpcap/get_packet.cpp ${COMMON_SOURCE})
-target_link_libraries(get_packet ${PCAP_LIBRARY})
-
-add_executable(fake_arp demo_libpcap/fake_arp.cpp ${COMMON_SOURCE})
-target_link_libraries(fake_arp ${PCAP_LIBRARY})
-
-add_executable(print_devices demo_libpcap/print_devices.cpp ${COMMON_SOURCE})
-target_link_libraries(print_devices ${PCAP_LIBRARY})
-
-add_executable(get_gateway demo_libpcap/get_gateway.cpp)
-target_link_libraries(get_gateway Threads::Threads)
-
 add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE})
 target_link_libraries(arpspf-test GTest::GTest GTest::Main)
 
