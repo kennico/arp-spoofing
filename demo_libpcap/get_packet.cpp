@@ -8,6 +8,8 @@
 #include <pcap.h>
 #include "arpspf.h"
 
+void fatal_error(const char *src, const char *err);
+
 int main(int argc, char* argv[]) {
     char errbuf[1024] = {0};
     char *device = pcap_lookupdev(errbuf);

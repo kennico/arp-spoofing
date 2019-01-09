@@ -13,9 +13,6 @@
 #include "arpspf.h"
 
 
-
-
-
 // query system info
 u_char src_mac[] = {
         u'\x50',u'\x2b',u'\x73',u'\xdc',u'\x54',u'\x3f'
@@ -52,6 +49,7 @@ int main(int argc, char* argv[]) {
     memcpy(sndbuf, &etherHdr, ETHER_HDR_LEN);
     static_assert(ARP_HDR_LEN == sizeof(arp_hdr), "length of arp_hdr != ARP_HDR_LEN");
     memcpy(sndbuf+ETHER_HDR_LEN, &arpHdr, ARP_HDR_LEN);
+
 
     char errbuf[1024] = {0};
     auto handle = pcap_open_live("wlx502b73dc543f", 4096, 1, 0, errbuf);

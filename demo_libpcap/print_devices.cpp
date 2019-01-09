@@ -11,6 +11,9 @@
 #include <iostream>
 #include "arpspf.h"
 
+void fatal_error(const char *src, const char *err);
+
+std::string get_address_string(const sockaddr *paddr);
 
 int main(int argc, char* argv[]) {
     char errbuf[1024] = {0};

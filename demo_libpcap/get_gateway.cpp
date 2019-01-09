@@ -8,10 +8,8 @@
 
 #include "arpspf.h"
 
-
-
 int main(int argc, char* argv[]) {
-    auto ip = get_gateway_ip("wlx502b73dc543f");
+    auto ip = kni::get_gateway_ip("wlx502b73dc543f");
     if (ip == -1) {
         perror("");
         return 1;
