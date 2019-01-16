@@ -18,50 +18,29 @@
 
 namespace kni {
 
+
     class packet_base {
     public:
 
-        explicit packet_base(size_t buffersize) : mem(new u_char[buffersize]), memlen(buffersize) {
+        packet_base(u_char *buf, size_t bsize) : buffer(buf), buffer_size(bsize) {
 
         }
 
         inline const u_char *content() const noexcept {
-            return mem.get();
+            return buffer;
         }
 
         inline size_t bufsize() const noexcept {
-            return memlen;
+            return buffer_size;
         }
 
-    protected:
-
         inline u_char *raw() noexcept {
-            return mem.get();
+            return buffer;
         }
 
     private:
-        std::unique_ptr<u_char[]> mem{};
-        size_t memlen{0};
-    };
-
-    class demo_arp_packet : public packet_base {
-    public:
-        demo_arp_packet()
-                : packet_base(ETHER_HDR_LEN + ARP_HDR_LEN),
-                  ethHdr(raw()),
-                  arpHdr(raw() + ETHER_HDR_LEN) {
-
-            arpHdr.htype = ARPHRD_ETHER;
-            arpHdr.ptype = ETH_P_IP;
-            arpHdr.hlen = 6;
-            arpHdr.plen = 4;
-
-            ethHdr.type = ETH_P_ARP;
-        }
-
-    protected:
-        modifyhdr_ether ethHdr;
-        modifyhdr_arp arpHdr;
+        u_char *buffer{nullptr};
+        size_t buffer_size{0};
     };
 
     class io_packet_base :
@@ -70,8 +49,21 @@ namespace kni {
 
     public:
 
-        io_packet_base(size_t bufsize, char *ebuf, size_t esize)
-                : packet_base(bufsize),
+//        io_packet_base(u_char* buf, size_t bsize)
+//                : packet_base(buf, bsize),
+//                  buffered_error(new char[PCAP_BUF_SIZE], PCAP_BUF_SIZE) {
+//
+//        }
+        /**
+         * Avoid memory management
+         *
+         * @param buf
+         * @param size
+         * @param ebuf
+         * @param esize
+         */
+        io_packet_base(u_char *buf, size_t size, char *ebuf, size_t esize)
+                : packet_base(buf, size),
                   buffered_error(ebuf, esize) {
 
         }
@@ -106,8 +98,8 @@ namespace kni {
 
     class arp_io_packet : public io_packet_base {
     public:
-        arp_io_packet(char *ebuf, size_t esize)
-                : io_packet_base(ETHER_HDR_LEN + ARP_HDR_LEN, ebuf, esize),
+        arp_io_packet(u_char *buf, size_t size, char *ebuf, size_t esize)
+                : io_packet_base(buf, size, ebuf, esize),
                   ethHdr(raw()),
                   arpHdr(raw() + ETHER_HDR_LEN) {
 
@@ -119,6 +111,10 @@ namespace kni {
             ethHdr.type = ETH_P_ARP;
         }
 
+        template<size_t size, size_t esize>
+        arp_io_packet(u_char (&buf)[size], char (&ebuf)[esize]) : arp_io_packet(buf, size, ebuf, esize) {
+
+        }
 
         /**
          *

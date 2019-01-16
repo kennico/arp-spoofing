@@ -21,6 +21,64 @@ namespace kni {
         return count;
     }
 
+//    class observer {
+//    public:
+//
+//        observer(u_char* buf_, size_t size_) : buffer(buf_), size(size_) {
+//
+//        }
+//
+//    public:
+//
+//        inline const u_char * buf() const noexcept {
+//            return buffer;
+//        }
+//
+//        inline u_char * buf() noexcept {
+//            return buffer;
+//        }
+//
+//        inline size_t bufsize() const noexcept {
+//            return size;
+//        }
+//
+//    private:
+//
+//        u_char * buffer;
+//        size_t size;
+//
+//    };
+//
+//    class auto_buf {
+//    public:
+//
+//        explicit auto_buf(size_t size_): mem(new u_char[size]), size(size_) {
+//
+//        }
+//
+////        auto_buf(auto_buf&&) = default; // https://stackoverflow.com/a/18290839/8706476
+//
+//        auto_buf(auto_buf&& b) : mem(std::move(b.mem)), size(b.size) {
+//            printf("move\n");
+//        }
+//
+//        inline const u_char * buf() const noexcept {
+//            return mem.get();
+//        }
+//
+//        inline u_char * buf() noexcept {
+//            return mem.get();
+//        }
+//
+//
+//        inline size_t bufsize() const noexcept {
+//            return size;
+//        }
+//
+//    private:
+//        std::unique_ptr<u_char[]> mem;
+//        size_t size{};
+//    };
 
     class buffered_error {
     public:

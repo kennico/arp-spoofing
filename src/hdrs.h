@@ -22,6 +22,9 @@
 
 #include <pcap.h>
 
+// Thread safety about printf and other posix stream output functions
+// https://stackoverflow.com/a/40186101/8706476
+
 #ifdef KNI_DEBUG
 #define KNI_LOG_DEBUG(...) do{\
     fprintf(stderr, "DEBUG: ");fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
@@ -34,8 +37,17 @@
 #define KNI_LOG_WARN(...) do{\
     fprintf(stderr, "WARN : ");fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
 }while(false)
+
 #else
 #define KNI_LOG_DEBUG(...)
 #define KNI_LOG_ERROR(...)
 #define KNI_LOG_WARN(...)
 #endif
+
+#define KNI_OUTPUT_LF(...) do {\
+    fprintf(stdout, __VA_ARGS__);fprintf(stdout, "\n");\
+}while(false)
+
+#define KNI_OUTPUT(...) do {\
+    fprintf(stdout, __VA_ARGS__);\
+}while(false)
