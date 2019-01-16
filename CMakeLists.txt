@@ -22,11 +22,11 @@ set(COMMON_SOURCE
         include/netinfo.h
         include/pkt.h
         src/hdrs.h
-        src/fields.h
-        src/misc.cpp src/gateway.cpp src/netinfo.cpp)
+        include/fields.h
+        src/misc.cpp src/gateway.cpp src/netinfo.cpp include/utils.h)
 
 
-add_executable(arpspf src/main.cpp ${COMMON_SOURCE} src/arpspf.cpp)
+add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
 target_link_libraries(arpspf ${PCAP_LIBRARY})
 
 add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE})

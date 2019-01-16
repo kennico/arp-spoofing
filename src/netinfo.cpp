@@ -2,21 +2,16 @@
 // Created by kenny on 1/6/19.
 //
 
-#include <utility>
-
 #include "hdrs.h"
+#include "utils.h"
 #include "netinfo.h"
 #include "fields.h"
 
 
-auto fmt_nmap_lan = "nmap -sn %s/%d";
-auto grep_ip_mac = R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
+constexpr auto fmt_nmap_lan = "nmap -sn %s/%d";
+constexpr auto grep_ip_mac = R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
 
 namespace kni {
-
-    netinfo::netinfo(size_t esize) : buffered_error(esize) {
-
-    }
 
     bool netinfo::update_arp() {
         auto netmask = *(unsigned int *) &devinfo.ip_netmask;
@@ -25,11 +20,11 @@ namespace kni {
         char script_line[128];
         sprintf(script_line, fmt_nmap_lan, to_string(devinfo.ip).c_str(), count_bits(netmask));
         sprintf(script_line + strlen(script_line), " | %s", grep_ip_mac);
-        LOG_DEBUG("Command: %s", script_line);
+        KNI_LOG_DEBUG("Command: %s", script_line);
 
         auto fp = popen(script_line, "r");
         if (fp == nullptr) {
-            get_syslib_error();
+            getsyserr();
             return false;
         }
 
@@ -55,6 +50,7 @@ namespace kni {
             tmpmap[ip] = mac;
         }
 
+        gateway_mac = tmpmap[gateway_ip];
         ipmac_mapping.clear();  // Discard outdated info
         ipmac_mapping.insert(tmpmap.begin(), tmpmap.end());
 
@@ -63,11 +59,11 @@ namespace kni {
         return true;
     }
 
-    bool netinfo::update_gateway() {
+    bool netinfo::update_gateway_ip() {
         auto ret = get_gateway_ip(devname.c_str());
 
         if (ret == -1) {
-            get_syslib_error();
+            getsyserr();
             return false;
         } else {
             gateway_ip = to_string(*(ipv4_t *) &ret);
@@ -77,7 +73,7 @@ namespace kni {
     }
 
     bool netinfo::set_dev(const char *dev) {
-        if (get_device_info(dev, &devinfo, error_buffer()) != -1) {
+        if (get_device_info(dev, &devinfo, errbuf()) != -1) {
             devname = dev;
             return true;
         } else {

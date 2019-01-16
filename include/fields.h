@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "hdrs.h"
+#include <cassert>
+#include <arpa/inet.h>
+
 #include "pkt.h"
 
 namespace kni {
@@ -26,18 +28,6 @@ namespace kni {
         u_char *from;
     };
 
-//template <size_t N>
-//class modify_multibytes_base {
-//public:
-//
-//    inline void set_assign_from(u_char*& snd_buf) {
-//        from = snd_buf;
-//        snd_buf += N;
-//    }
-//
-//protected:
-//    u_char * from;
-//};
 
     struct modify_uchar : public modify_field_base<u_char> {
 
@@ -81,6 +71,11 @@ namespace kni {
     struct modify_mac : public modify_field_base<mac_t> {
         inline modify_mac &operator=(const char *mac) {
             assert(mac_pton(mac, from));
+            return *this;
+        }
+
+        inline modify_mac &operator=(const std::string &mac) {
+            assert(mac_pton(mac.c_str(), from));
             return *this;
         }
 
@@ -129,13 +124,13 @@ namespace kni {
         u_char *pkt{nullptr};
     };
 
-    struct fake_ether_hdr : public fake_pkt_base<ETHER_HDR_LEN> {
+    struct modifyhdr_ether : public fake_pkt_base<ETHER_HDR_LEN> {
 
         modify_mac src{};
         modify_mac dst{};
         modify_ushort type{};
 
-        explicit fake_ether_hdr(u_char *buf) : fake_pkt_base(buf) {
+        explicit modifyhdr_ether(u_char *buf) : fake_pkt_base(buf) {
             set_assign_to(dst);
             set_assign_to(src);
             set_assign_to(type);
@@ -144,7 +139,7 @@ namespace kni {
 
     };
 
-    struct fake_arp_hdr : public fake_pkt_base<ARP_HDR_LEN> {
+    struct modifyhdr_arp : public fake_pkt_base<ARP_HDR_LEN> {
 
         modify_ushort htype{};
         modify_ushort ptype{};
@@ -156,7 +151,7 @@ namespace kni {
         modify_mac tha{};
         modify_ipv4 tpa{};
 
-        explicit fake_arp_hdr(u_char *buf) : fake_pkt_base(buf) {
+        explicit modifyhdr_arp(u_char *buf) : fake_pkt_base(buf) {
             set_assign_to(htype);
             set_assign_to(ptype);
 

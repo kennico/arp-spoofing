@@ -164,15 +164,15 @@ namespace kni {
                 if (ia != nullptr)
                     tmpinfo.ip_bcast = ia->sin_addr;
                 else
-                    LOG_DEBUG("dev: %s ip: %s BCAST address not found.",
-                              devname, to_string(tmpinfo.ip).c_str());
+                    KNI_LOG_WARN("dev: %s ip: %s BCAST address not found.",
+                                 devname, to_string(tmpinfo.ip).c_str());
 
                 ia = (sockaddr_in *) sa->netmask;
                 if (ia != nullptr)
                     tmpinfo.ip_netmask = ia->sin_addr;
                 else
-                    LOG_DEBUG("dev: %s ip: %s netmask not found.",
-                              devname, to_string(tmpinfo.ip).c_str());
+                    KNI_LOG_WARN("dev: %s ip: %s netmask not found.",
+                                 devname, to_string(tmpinfo.ip).c_str());
 
                 found_ip = 1;
 
@@ -186,8 +186,8 @@ namespace kni {
                 if (lla)
                     memcpy(&tmpinfo.hw_bcast, lla->sll_addr, MAC_ADDRLEN);
                 else
-                    LOG_DEBUG("dev: %s mac: %s BCAST address not found.",
-                              devname, to_string(tmpinfo.hw_addr).c_str());
+                    KNI_LOG_WARN("dev: %s mac: %s BCAST address not found.",
+                                 devname, to_string(tmpinfo.hw_addr).c_str());
 
                 found_mac = 1;
             }

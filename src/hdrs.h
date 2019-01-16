@@ -23,18 +23,19 @@
 #include <pcap.h>
 
 #ifdef KNI_DEBUG
-#define LOG_DEBUG(...) do{\
+#define KNI_LOG_DEBUG(...) do{\
     fprintf(stderr, "DEBUG: ");fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
 }while(false)
 
-#define LOG_ERROR(...) do{\
+#define KNI_LOG_ERROR(...) do{\
     fprintf(stderr, "ERROR: %s() in %s(%d)\n\t",__FUNCTION__, __FILE__, __LINE__);fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
 }while(false)
-#else
-#define LOG_DEBUG(...)
-#define LOG_ERROR(...)
-#endif
 
-namespace kni {
-    int count_bits(unsigned int);
-}
+#define KNI_LOG_WARN(...) do{\
+    fprintf(stderr, "WARN : ");fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
+}while(false)
+#else
+#define KNI_LOG_DEBUG(...)
+#define KNI_LOG_ERROR(...)
+#define KNI_LOG_WARN(...)
+#endif

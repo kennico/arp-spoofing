@@ -3,7 +3,7 @@
 //
 
 #include <gtest/gtest.h>
-#include "../src/fields.h"
+#include "fields.h"
 
 using namespace kni;
 

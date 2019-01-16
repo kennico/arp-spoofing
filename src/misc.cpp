@@ -6,7 +6,7 @@
 #include "hdrs.h"
 
 void fatal_error(const char *src, const char *error) {
-    LOG_ERROR("Fatal error in %s - %s\n", src, error);
+    KNI_LOG_ERROR("Fatal error in %s - %s\n", src, error);
     exit(1);
 }
 
@@ -40,16 +40,6 @@ std::string get_address_string(const sockaddr *paddr) {
 
 namespace kni {
 
-
-    int count_bits(unsigned int n) {
-        int count = 0;
-        while (n) {
-            if (n & 0x1)
-                count++;
-            n >>= 1;
-        }
-        return count;
-    }
 
     std::string to_string(const ipv4_t &ipv4) {
         char buf[16];

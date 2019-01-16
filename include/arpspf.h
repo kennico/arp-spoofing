@@ -5,81 +5,147 @@
 #pragma once
 
 #include <pcap.h>
+#include <memory>
+
+#include <sys/socket.h>
+#include <linux/if_arp.h>
+//#include <linux/if_ether.h>
 
 #include "netinfo.h"
 #include "pkt.h"
+#include "fields.h"
+#include "utils.h"
 
 namespace kni {
 
-    class fake_ether_hdr;
-
-    class fake_arp_hdr;
-
-    class arp_packet_base {
+    class packet_base {
     public:
-//    arp_packet_base();
-        explicit arp_packet_base(size_t);
 
-        arp_packet_base(u_char *, size_t);
+        explicit packet_base(size_t buffersize) : mem(new u_char[buffersize]), memlen(buffersize) {
 
-//    void buffer(size_t size);
-//    void buffer(u_char* sndbuf, size_t sndsize);
-//    template <size_t sndsize>
-//    void buffer(u_char(&sndbuf)[sndsize]);
+        }
 
-        virtual ~arp_packet_base();
-
-        virtual void construct_packets();
-
-        virtual void apply_default_values() = 0;
+        inline const u_char *content() const noexcept {
+            return mem.get();
+        }
 
         inline size_t bufsize() const noexcept {
-            return sndbufsize;
-        }
-
-        inline const u_char *buffer() const noexcept {
-            return sndbuf;
+            return memlen;
         }
 
     protected:
-        fake_ether_hdr *hdr_ether{nullptr};
-        fake_arp_hdr *hdr_arp{nullptr};
+
+        inline u_char *raw() noexcept {
+            return mem.get();
+        }
 
     private:
-
-        u_char *sndbuf{nullptr};
-        size_t sndbufsize{0};
-        bool allocbuf{true};
+        std::unique_ptr<u_char[]> mem{};
+        size_t memlen{0};
     };
 
-    class arp_attack :
-            public arp_packet_base,
-            public buffered_error {
+    class demo_arp_packet : public packet_base {
     public:
-        arp_attack(netinfo *, size_t, size_t errsize = PCAP_ERRBUF_SIZE);
+        demo_arp_packet()
+                : packet_base(ETHER_HDR_LEN + ARP_HDR_LEN),
+                  ethHdr(raw()),
+                  arpHdr(raw() + ETHER_HDR_LEN) {
 
-        arp_attack(netinfo *, u_char *, size_t, size_t errsize = PCAP_ERRBUF_SIZE);
+            arpHdr.htype = ARPHRD_ETHER;
+            arpHdr.ptype = ETH_P_IP;
+            arpHdr.hlen = 6;
+            arpHdr.plen = 4;
 
-        ~arp_attack() override;
+            ethHdr.type = ETH_P_ARP;
+        }
 
-        void set_fake_ip(const std::string &);
+    protected:
+        modifyhdr_ether ethHdr;
+        modifyhdr_arp arpHdr;
+    };
 
-        void set_fake_ip(ipv4_t ipv4);
+    class io_packet_base :
+            public packet_base,
+            public buffered_error {
 
-        bool fake_reply_to(const std::string &);
+    public:
 
-        bool spoof(const std::string &, const std::string &);
+        io_packet_base(size_t bufsize, char *ebuf, size_t esize)
+                : packet_base(bufsize),
+                  buffered_error(ebuf, esize) {
 
-        bool fake_bcast();
+        }
 
-        bool open();
+        inline bool open(const std::string &devname) {
+            handle = pcap_open_live(devname.c_str(), 4096, 1, 0, errbuf());
+            return handle != nullptr;
+        }
 
-        void apply_default_values() override;
+        inline void close() {
+            if (handle)
+                pcap_close(handle);
+            handle = nullptr;
+        }
 
 
     protected:
 
+        inline bool send_packet(int pktsize) {
+            int ret = pcap_sendpacket(handle, content(), pktsize);
+            if (ret == PCAP_ERROR) {
+                snprintf(errbuf(), errbufsize(), "%s", pcap_geterr(handle));
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+    private:
         pcap_t *handle{nullptr};
-        netinfo *netdb{nullptr};
     };
+
+    class arp_io_packet : public io_packet_base {
+    public:
+        arp_io_packet(char *ebuf, size_t esize)
+                : io_packet_base(ETHER_HDR_LEN + ARP_HDR_LEN, ebuf, esize),
+                  ethHdr(raw()),
+                  arpHdr(raw() + ETHER_HDR_LEN) {
+
+            arpHdr.htype = ARPHRD_ETHER;
+            arpHdr.ptype = ETH_P_IP;
+            arpHdr.hlen = 6;
+            arpHdr.plen = 4;
+
+            ethHdr.type = ETH_P_ARP;
+        }
+
+
+        /**
+         *
+         * @param sender_ip sender's protocol(ip) address
+         * @param sender_mac sender's hardware address
+         * @param target_ip target's protocol(ip) address
+         * @param target_mac target's hardware address
+         * @return
+         */
+        inline bool reply(const std::string &sender_ip, const mac_t &sender_mac, const std::string &target_ip,
+                          const mac_t &target_mac) {
+            arpHdr.spa = sender_ip;
+            arpHdr.sha = sender_mac;
+            arpHdr.tpa = target_ip;
+            arpHdr.tha = target_mac;
+            arpHdr.oper = ARPOP_REPLY;
+
+            ethHdr.src = sender_mac;
+            ethHdr.dst = target_mac;
+
+            return send_packet(ETHER_HDR_LEN + ARP_HDR_LEN);
+        }
+
+    private:
+        modifyhdr_ether ethHdr;
+        modifyhdr_arp arpHdr;
+
+    };
+
 }

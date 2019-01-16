@@ -8,50 +8,13 @@
 #include <cstring>
 
 #include "pkt.h"
+#include "utils.h"
+#include "fields.h"
 
 namespace kni {
 
 
     int get_gateway_ip(const char *dev = nullptr, int attempts = 5, int ms = 50);
-
-    class buffered_error {
-
-    public:
-
-        explicit buffered_error(size_t bufsize) {
-            errbuf = new char[bufsize];
-            errbufsize = bufsize;
-        }
-
-        inline const char *error() const noexcept {
-            return errbuf;
-        }
-
-        inline size_t error_bufsize() const noexcept {
-            return errbufsize;
-        }
-
-        inline const char *get_syslib_error() const {
-            strerror_r(errno, errbuf, errbufsize);
-            return errbuf;
-        }
-
-        virtual ~buffered_error() {
-            delete[] errbuf;
-        }
-
-    protected:
-
-        inline char *error_buffer() noexcept {
-            return errbuf;
-        }
-
-    private:
-
-        char *errbuf{nullptr};
-        size_t errbufsize{0};
-
-    };
 
     struct devinfo_t {
         mac_t hw_addr{};
@@ -66,19 +29,26 @@ namespace kni {
     class netinfo : public buffered_error {
     public:
 
-        explicit netinfo(size_t);
+        netinfo(char *errbuf, size_t errbufsize) : buffered_error(errbuf, errbufsize) {
 
-        ~netinfo() override = default;
+        }
 
         bool set_dev(const char *);
 
         bool update_arp();
 
-        bool update_gateway();
+        bool update_gateway_ip();
 
 
         inline bool cached(const std::string &ip) const noexcept {
             return ipmac_mapping.count(ip) > 0;
+        }
+
+        inline bool neighbour(const std::string &ip) const noexcept {
+            ipv4_t ipv4;
+            if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1)
+                return false;
+
         }
 
         inline const ipmac_map_t &mapping() const noexcept {
@@ -90,13 +60,14 @@ namespace kni {
         }
 
     public:
-        devinfo_t devinfo;
-        std::string gateway_ip;
-        std::string devname;
+        devinfo_t devinfo{};
+        std::string gateway_ip{};
+        std::string devname{};
+        mac_t gateway_mac{};
 
     private:
 
-        ipmac_map_t ipmac_mapping;
+        ipmac_map_t ipmac_mapping{};
 
     };
 
