@@ -44,13 +44,6 @@ namespace kni {
             return ipmac_mapping.count(ip) > 0;
         }
 
-        inline bool neighbour(const std::string &ip) const noexcept {
-            ipv4_t ipv4;
-            if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1)
-                return false;
-
-        }
-
         inline const ipmac_map_t &mapping() const noexcept {
             return ipmac_mapping;
         }

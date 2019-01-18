@@ -10,33 +10,6 @@ void fatal_error(const char *src, const char *error) {
     exit(1);
 }
 
-std::string get_address_string(const sockaddr *paddr) {
-    if (paddr == nullptr)
-        return "";
-
-    char buffer[INET6_ADDRSTRLEN] = {0};
-
-    switch (paddr->sa_family) {
-        case AF_INET:
-            return kni::to_string(((const sockaddr_in *) paddr)->sin_addr);
-
-        case AF_INET6:
-            return kni::to_string(((const sockaddr_in6 *) paddr)->sin6_addr);
-            break;
-
-        case AF_PACKET: {
-            auto p = (const sockaddr_ll *) paddr;
-            assert(p->sll_halen == 6);
-            kni::mac_ntop(p->sll_addr, buffer, sizeof(buffer));
-            break;
-        }
-        default:
-            return "";
-    }
-
-    return std::string(buffer);
-}
-
 
 namespace kni {
 

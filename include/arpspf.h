@@ -101,7 +101,7 @@ namespace kni {
         arp_io_packet(u_char *buf, size_t size, char *ebuf, size_t esize)
                 : io_packet_base(buf, size, ebuf, esize),
                   ethHdr(raw()),
-                  arpHdr(raw() + ETHER_HDR_LEN) {
+                  arpHdr(raw() + ETHER_HDRLEN) {
 
             arpHdr.htype = ARPHRD_ETHER;
             arpHdr.ptype = ETH_P_IP;
@@ -135,7 +135,7 @@ namespace kni {
             ethHdr.src = sender_mac;
             ethHdr.dst = target_mac;
 
-            return send_packet(ETHER_HDR_LEN + ARP_HDR_LEN);
+            return send_packet(ETHER_HDRLEN + ARP_HDRLEN);
         }
 
     private:

@@ -60,19 +60,19 @@ struct {
 
 
 int main(int argc, char *argv[]) {
-    if (argc == 1) {
+    if (argc == 1)
         fatal_error(APP_NAME, "missing device name");
-    } else if (strcmp(argv[1], "lo") == 0) {
+    else if (strcmp(argv[1], "lo") == 0)
         fatal_error(APP_NAME, "using lo doesn't make sense");
-    }
+
 
     const size_t errbufsize = 1024;
     std::unique_ptr<char[]> errbuf(new char[errbufsize]);
 
     netdb = new netinfo(errbuf.get(), errbufsize);
-    if (!netdb->set_dev(argv[1]) || !netdb->update_gateway_ip()) {
+    if (!netdb->set_dev(argv[1]) || !netdb->update_gateway_ip())
         fatal_error(APP_NAME, netdb->error());
-    }
+
 
     std::map<std::string, arpspf_func> arpspf_cmd;
 
@@ -156,7 +156,7 @@ void *thread_spoof(void *) {
     auto args = &thread_spoof_args;
 
     char err_buf[PCAP_ERRBUF_SIZE] = {0};
-    u_char pkt_buf[ETHER_HDR_LEN + ARP_HDR_LEN] = {0};
+    u_char pkt_buf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
 
     arp_io_packet arp_io(pkt_buf, err_buf);
 
@@ -319,7 +319,7 @@ void arpspf_spoof_start(int argc, char **argv) {
         pthread_join(thread_spoof_args.thread_id, nullptr);
         thread_spoof_args.to_be_running = false;
     } else {
-        sleep(2); // attempt to avoid the competion of another thread's output and the "prompt string one"
+        sleep(2); // attempt to avoid the competition of another thread's output and the "prompt string one"
     }
 }
 

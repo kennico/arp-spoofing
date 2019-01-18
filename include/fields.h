@@ -124,7 +124,7 @@ namespace kni {
         u_char *pkt{nullptr};
     };
 
-    struct modifyhdr_ether : public fake_pkt_base<ETHER_HDR_LEN> {
+    struct modifyhdr_ether : public fake_pkt_base<ETHER_HDRLEN> {
 
         modify_mac src{};
         modify_mac dst{};
@@ -139,7 +139,7 @@ namespace kni {
 
     };
 
-    struct modifyhdr_arp : public fake_pkt_base<ARP_HDR_LEN> {
+    struct modifyhdr_arp : public fake_pkt_base<ARP_HDRLEN> {
 
         modify_ushort htype{};
         modify_ushort ptype{};

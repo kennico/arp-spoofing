@@ -9,8 +9,9 @@
 #include <netinet/in.h>
 
 #define MAC_ADDRLEN 6
-#define ETHER_HDR_LEN 14
-#define ARP_HDR_LEN 28
+#define ETHER_HDRLEN 14
+#define ARP_HDRLEN 28
+#define IPV4_BASE_HDRLEN 20
 
 namespace kni {
 
