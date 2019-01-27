@@ -6,30 +6,44 @@
 #include <memory>
 
 TEST(Usage, MoveUniquePtr) {
+    static std::string o;
 
     struct unamed {
 
-        unamed(int n) : id(n) {
-            printf("Unamed %d construted\n", id);
+        unamed() {
+            o += "ctor";
         }
 
-        unamed(const unamed &u) : id(u.id) {
-            printf("Unamed %d copied\n", id);
+        unamed(const unamed &u) {
+            o += "copy";
         }
 
         ~unamed() {
-            printf("Unamed %d to be deallocated\n", id);
+            o += "dtor";
         }
-
-        int id{0};
 
     };
 
-    std::unique_ptr<unamed> a(new unamed(99));
-    printf("unique_ptr a:%d\n", a->id);
-
+    std::unique_ptr<unamed> a(new unamed());
     std::unique_ptr<unamed> b = std::move(a);
-    EXPECT_NO_THROW(printf("unique_ptr b:%d\n", b->id));
+
+    EXPECT_EQ("ctor", o);
+    EXPECT_NO_THROW(printf("unique_ptr b:%p\n", b.get()));
 //    std::unique_ptr<unamed> c = a;
 }
 
+TEST(Usage, SussesiveCall) {
+    struct t {
+        t &operator()(char c) {
+            s.push_back(c);
+            return *this;
+        }
+
+        std::string s;
+    };
+
+    t u;
+    u('A')('B')('C')('D');
+
+    EXPECT_EQ("ABCD", u.s);
+}

@@ -51,3 +51,8 @@
 #define KNI_OUTPUT(...) do {\
     fprintf(stdout, __VA_ARGS__);\
 }while(false)
+
+#define KNI_FATAL_ERROR(string) do {\
+    KNI_LOG_ERROR("Fatal error - %s\n", string);\
+    exit(1);\
+} while(false)

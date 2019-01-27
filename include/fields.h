@@ -5,23 +5,27 @@
 #pragma once
 
 #include <cassert>
+#include <list>
 #include <arpa/inet.h>
 
 #include "pkt.h"
 
 namespace kni {
 
-    template<typename net_type>
-    class modify_field_base {
+    template<typename network_t>
+    class modifyfld_base {
     public:
-
-        inline void set_assign_from(u_char *&buf) {
-            from = buf;
-            buf += sizeof(net_type);
-        }
 
         inline const u_char *data() const noexcept {
             return from;
+        }
+
+        inline constexpr size_t size() const noexcept {
+            return sizeof(network_t);
+        }
+
+        inline void set_from(u_char *buf) noexcept {
+            from = buf;
         }
 
     protected:
@@ -29,7 +33,7 @@ namespace kni {
     };
 
 
-    struct modify_uchar : public modify_field_base<u_char> {
+    struct modify_uchar : public modifyfld_base<u_char> {
 
         inline modify_uchar &operator=(u_char ch) {
             *from = ch;
@@ -37,21 +41,21 @@ namespace kni {
         }
     };
 
-    struct modify_ushort : public modify_field_base<u_short> {
+    struct modify_ushort : public modifyfld_base<u_short> {
         inline modify_ushort &operator=(u_short sh) {
             *(u_short *) from = htons(sh);
             return *this;
         }
     };
 
-    struct modify_uint : public modify_field_base<u_int> {
+    struct modify_uint : public modifyfld_base<u_int> {
         inline modify_uint &operator=(u_int ui) {
             *(u_int *) from = htonl(ui);
             return *this;
         }
     };
 
-    struct modify_ipv4 : public modify_field_base<ipv4_t> {
+    struct modify_ipv4 : public modifyfld_base<ipv4_t> {
         inline modify_ipv4 &operator=(ipv4_t addr) {
             *(ipv4_t *) from = addr;
             return *this;
@@ -68,7 +72,7 @@ namespace kni {
         }
     };
 
-    struct modify_mac : public modify_field_base<mac_t> {
+    struct modify_mac : public modifyfld_base<mac_t> {
         inline modify_mac &operator=(const char *mac) {
             assert(mac_pton(mac, from));
             return *this;
@@ -91,79 +95,129 @@ namespace kni {
         }
     };
 
-    template<size_t header_len>
-    class fake_pkt_base {
+
+    class modifyhdr_base {
+    private:
+        class fields_initializer {
+        public:
+
+            explicit fields_initializer(u_char *buf_) : buf(buf_) {
+
+            }
+
+            template<typename Field>
+            inline fields_initializer &operator()(Field &field) noexcept {
+                field.set_from(buf);
+                buf += field.size();
+                return *this;
+            }
+
+        private:
+            u_char *buf{nullptr};
+        };
+
     public:
-
-        explicit fake_pkt_base(u_char *buf) : pkt(buf), from(buf) {
+        explicit modifyhdr_base(size_t len) : hdrlen(len) {
 
         }
 
-        inline const u_char *packet() const noexcept {
-            return pkt;
+        inline size_t length() const noexcept {
+            return hdrlen;
         }
 
-        inline const u_char *end() const noexcept {
-            return pkt + bytes();
-        }
-
-        inline static constexpr size_t bytes() noexcept {
-            return header_len;
-        }
+        virtual void set_input(u_char *buf) = 0;
 
     protected:
 
-        template<typename modify_field>
-        void set_assign_to(modify_field &field) {
-            field.set_assign_from(from);
+        inline static fields_initializer field_begin(u_char *buf) noexcept {
+            return fields_initializer(buf);
         }
 
-    private:
-
-        u_char *from{nullptr};
-        u_char *pkt{nullptr};
+    protected:
+        size_t hdrlen;
     };
 
-    struct modifyhdr_ether : public fake_pkt_base<ETHER_HDRLEN> {
+    struct modifyhdr_ether : public modifyhdr_base {
+
+        modifyhdr_ether() : modifyhdr_base(ETHER_HDRLEN) {
+
+        }
+
+        void set_input(u_char *buf) override {
+            field_begin(buf)(dst)(src)(type);
+        }
 
         modify_mac src{};
         modify_mac dst{};
         modify_ushort type{};
-
-        explicit modifyhdr_ether(u_char *buf) : fake_pkt_base(buf) {
-            set_assign_to(dst);
-            set_assign_to(src);
-            set_assign_to(type);
-        }
-
-
     };
 
-    struct modifyhdr_arp : public fake_pkt_base<ARP_HDRLEN> {
+    struct modifyhdr_arp : public modifyhdr_base {
 
-        modify_ushort htype{};
-        modify_ushort ptype{};
-        modify_uchar hlen{};
-        modify_uchar plen{};
+        modify_ushort htype{}, ptype{};
+        modify_uchar hlen{}, plen{};
         modify_ushort oper{};
-        modify_mac sha{};
-        modify_ipv4 spa{};
-        modify_mac tha{};
-        modify_ipv4 tpa{};
+        modify_mac sha{}, tha{};
+        modify_ipv4 spa{}, tpa{};
 
-        explicit modifyhdr_arp(u_char *buf) : fake_pkt_base(buf) {
-            set_assign_to(htype);
-            set_assign_to(ptype);
+        modifyhdr_arp() : modifyhdr_base(ARP_HDRLEN) {
 
-            set_assign_to(hlen);
-            set_assign_to(plen);
-            set_assign_to(oper);
+        }
 
-            set_assign_to(sha);
-            set_assign_to(spa);
-            set_assign_to(tha);
-            set_assign_to(tpa);
+        void set_input(u_char *buf) override {
+            field_begin(buf)
+                    (htype)(ptype)(hlen)(plen)
+                    (oper)
+                    (sha)(spa)(tha)(tpa);
         }
 
     };
+
+    class modifypkt_base {
+    public:
+
+        virtual void set_input(u_char *buf) {
+            buffer = buf;
+            for (auto hdr : headers) {
+                hdr->set_input(buf);
+                buf += hdr->length();
+            }
+        }
+
+        inline const u_char *content() const noexcept {
+            return buffer;
+        }
+
+        inline u_char *raw() noexcept {
+            return buffer;
+        }
+
+    protected:
+        void add_header(modifyhdr_base *pkt) {
+            headers.push_back(pkt);
+        }
+
+    private:
+
+        std::list<modifyhdr_base *> headers{};
+        u_char *buffer{nullptr};
+
+    };
+
+    struct modifypkt_arp : public modifypkt_base {
+
+        modifyhdr_ether ethHdr;
+        modifyhdr_arp arpHdr;
+
+        modifypkt_arp() : ethHdr(), arpHdr() {
+            add_header(&ethHdr);
+            add_header(&arpHdr);
+        }
+
+    };
+
+//    struct modifypkt_ip : public modifypkt_base {
+//
+//    };
+
 }

@@ -5,11 +5,6 @@
 #include "arpspf.h"
 #include "hdrs.h"
 
-void fatal_error(const char *src, const char *error) {
-    KNI_LOG_ERROR("Fatal error in %s - %s\n", src, error);
-    exit(1);
-}
-
 
 namespace kni {
 

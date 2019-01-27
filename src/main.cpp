@@ -38,8 +38,6 @@ void arpspf_hijack(int, char **);
 
 void arpspf_device(int, char **);
 
-void fatal_error(const char *src, const char *err);
-
 
 netinfo *netdb;
 int keep_looping = 1;
@@ -61,9 +59,9 @@ struct {
 
 int main(int argc, char *argv[]) {
     if (argc == 1)
-        fatal_error(APP_NAME, "missing device name");
+        KNI_FATAL_ERROR("missing device name");
     else if (strcmp(argv[1], "lo") == 0)
-        fatal_error(APP_NAME, "using lo doesn't make sense");
+        KNI_FATAL_ERROR("using lo doesn't make sense");
 
 
     const size_t errbufsize = 1024;
@@ -71,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     netdb = new netinfo(errbuf.get(), errbufsize);
     if (!netdb->set_dev(argv[1]) || !netdb->update_gateway_ip())
-        fatal_error(APP_NAME, netdb->error());
+        KNI_FATAL_ERROR(netdb->error());
 
 
     std::map<std::string, arpspf_func> arpspf_cmd;
@@ -155,10 +153,11 @@ void arpspf_exit(int argc, char **argv) {
 void *thread_spoof(void *) {
     auto args = &thread_spoof_args;
 
-    char err_buf[PCAP_ERRBUF_SIZE] = {0};
-    u_char pkt_buf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
+    char errbuf[PCAP_ERRBUF_SIZE] = {0};
+    arp_io_packet arp_io(errbuf);
 
-    arp_io_packet arp_io(pkt_buf, err_buf);
+    u_char sndbuf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
+    arp_io.set_input(sndbuf);
 
     if (!arp_io.open(netdb->devname)) {
         KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.error());

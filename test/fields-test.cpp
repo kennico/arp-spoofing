@@ -8,53 +8,65 @@
 using namespace kni;
 
 TEST(ModifyFields, ModifyIPV4) {
-    u_char buf[32] = {};
+    struct unamed : public modifyhdr_base {
+        unamed() : modifyhdr_base(sizeof(ipv4)) {
 
-    struct unamed : public fake_pkt_base<4> {
-        explicit unamed(u_char *buf) : fake_pkt_base(buf) {
-            set_assign_to(ipv4);
+        }
+
+        void set_input(u_char *buf) override {
+            field_begin(buf)(ipv4);
         }
 
         modify_ipv4 ipv4{};
-    } pkt(buf);
+    } pkt;
 
+    u_char buf[32] = {};
+
+    pkt.set_input(buf);
     pkt.ipv4 = "1.2.3.4";
-    EXPECT_EQ(0x04030201, *(int *) pkt.packet());
+
     EXPECT_EQ(0x04030201, *(int *) (pkt.ipv4.data()));
 }
 
 TEST(ModifyFields, ModifyMAC) {
-    u_char buf[32] = {};
+    struct unamed : public modifyhdr_base {
+        unamed() : modifyhdr_base(sizeof(mac_t)) {
 
-    struct unamed : public fake_pkt_base<6> {
-        explicit unamed(u_char *buf) : fake_pkt_base(buf) {
-            set_assign_to(mac);
+        }
+
+        void set_input(u_char *buf) override {
+            field_begin(buf)(mac);
         }
 
         modify_mac mac{};
-    } pkt(buf);
+    } pkt;
 
+    u_char buf[32] = {};
+
+    pkt.set_input(buf);
     pkt.mac = "48:48:48:48:48:48";
-    EXPECT_EQ(0, memcmp(pkt.packet(), "HHHHHH", 6));
+
     EXPECT_EQ(0, memcmp(pkt.mac.data(), "HHHHHH", 6));
 }
 
 TEST(ModifyFields, ModifyIPV4MAC) {
-    u_char buf[32] = {};
+    struct unamed : public modifyhdr_base {
+        unamed() : modifyhdr_base(sizeof(src) + sizeof(dst) + sizeof(ipv4)) {
 
-    struct unamed : public fake_pkt_base<16> {
+        }
 
-        explicit unamed(u_char *buf) : fake_pkt_base(buf) {
-            set_assign_to(src);
-            set_assign_to(dst);
-            set_assign_to(ipv4);
+        void set_input(u_char *buf) override {
+            field_begin(buf)(src)(dst)(ipv4);
         }
 
         modify_mac src{};
         modify_mac dst{};
         modify_ipv4 ipv4{};
 
-    } pkt(buf);
+    } pkt;
+
+    u_char buf[32] = {};
+    pkt.set_input(buf);
 
     pkt.src = "44:44:44:44:44:44"; // D
     pkt.dst = "56:56:56:56:56:56"; // V
