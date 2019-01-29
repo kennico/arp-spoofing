@@ -8,10 +8,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define MAC_ADDRLEN 6
-#define ETHER_HDRLEN 14
-#define ARP_HDRLEN 28
-#define IPV4_BASE_HDRLEN 20
+#define MAC_ADDRLEN     6
+#define ETHER_HDRLEN    14
+#define ARP_HDRLEN      28
+#define IPV4_HDRLEN     20 // no options
+#define TCP_HDRLEN      40 // no options
+#define IPV6_HDRLEN     40
 
 namespace kni {
 

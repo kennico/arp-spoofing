@@ -12,13 +12,15 @@
 
 #include <initializer_list>
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <arpa/inet.h>
 #include <linux/if_packet.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
 
 #include <pcap.h>
 

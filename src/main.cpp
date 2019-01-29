@@ -157,7 +157,7 @@ void *thread_spoof(void *) {
     arp_io_packet arp_io(errbuf);
 
     u_char sndbuf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
-    arp_io.set_input(sndbuf);
+    arp_io.update_input(sndbuf);
 
     if (!arp_io.open(netdb->devname)) {
         KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.error());

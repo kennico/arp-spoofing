@@ -29,7 +29,6 @@ set(COMMON_SOURCE
 add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
 target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
-add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE} test/usage-unique_ptr.cpp test/packet-test.cpp)
+add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE} test/usage-unique_ptr.cpp test/header-test.cpp test/tmpl_traits-test.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
-
 

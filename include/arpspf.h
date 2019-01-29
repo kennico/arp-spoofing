@@ -82,8 +82,8 @@ namespace kni {
 
         }
 
-        void set_input(u_char *buf) override {
-            modifypkt_base::set_input(buf);
+        void update_input(u_char *buf) override {
+            modifypkt_base::update_input(buf);
 
             arpHdr.htype = ARPHRD_ETHER;
             arpHdr.ptype = ETH_P_IP;
