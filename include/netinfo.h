@@ -14,14 +14,21 @@
 namespace kni {
 
 
+    /**
+     *
+     * @param dev device name
+     * @param attempts
+     * @param ms time interval between two attempts
+     * @return
+     */
     int get_gateway_ip(const char *dev = nullptr, int attempts = 5, int ms = 50);
 
     struct devinfo_t {
-        mac_t hw_addr{};
-        mac_t hw_bcast{};
-        ipv4_t ip{};
-        ipv4_t ip_bcast{};
-        ipv4_t ip_netmask{};
+        mac_t hw_addr{};        // Hardware address
+        mac_t hw_bcast{};       // Broadcast hardware address
+        ipv4_t ip{};            // IPv4 address
+        ipv4_t ip_bcast{};      // Broadcast IPv4 address
+        ipv4_t ip_netmask{};    // Subnet mask
     };
 
     using ipmac_map_t = std::map<std::string, mac_t>;
@@ -33,7 +40,13 @@ namespace kni {
 
         }
 
-        bool set_dev(const char *);
+        /**
+         * Obtain device's info
+         *
+         * @param dev device name
+         * @return
+         */
+        bool set_dev(const char *dev);
 
         bool update_arp();
 

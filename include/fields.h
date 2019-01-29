@@ -126,7 +126,7 @@ namespace kni {
 
         using padding_type = typename padding_traits::padding_type;
 
-        static_assert(std::is_unsigned<padding_type>::value, "An unsigned padding type is required");
+        static_assert(std::is_unsigned<padding_type>::value, "unsigned required");
         static_assert(nbits <= BITS_MAXLEN, "Length limit exceeded");
         static_assert(nbits != 0, "Zero length");       // 0 < nbits <= 32
 
@@ -148,20 +148,6 @@ namespace kni {
             *(padding_type *) from_ptr = (
                     ((*(padding_type *) from_ptr) & n_inv_mask) |
                     padding_traits::hton(value << r_align));
-
-
-//            /*
-//             * can i read an unsigned int and write it?
-//             */
-//            u_char tmp[4] = {0}, *pval = (u_char*)&value;
-//            for (int i = 0; i < bytes; ++i)
-//                tmp[i] = from_ptr[i];
-//
-//            for (int i = 1; i <= bytes; ++i)
-//                tmp[bytes-i] &= pval[i-1]; // value is little endian
-//
-//            for (int i = 0; i < bytes; ++i)
-//                from_ptr[i]=tmp[i];
 
             return *this;
         };
@@ -196,8 +182,8 @@ namespace kni {
 
     private:
 
-        size_t off{0}, r_align{0};
-        padding_type n_inv_mask{};
+        size_t off{0}, r_align{0};  // How many bits are there from its end to the first 8-bit byte
+        padding_type n_inv_mask{};  // Leave zeros for desired bits while ones for surrounding bits
 
     };
 
@@ -334,14 +320,14 @@ namespace kni {
          * Currently reading any header fields after accepting uninitialized buffer leads to UB
          *
          * @param buf
-         * @return
+         * @return header length
          */
         virtual size_t update_hdr(u_char *buf) = 0;
 
 
         /**
          *
-         * @param buf
+         * @param buf to be interpreted as the header
          * @return an object used to attach fields to buf via its overloaded parenthesis operator
          */
         inline static hdr_builder field_begin(u_char *buf) noexcept {
@@ -358,9 +344,9 @@ namespace kni {
 
         }
 
-        modify_mac src{};
-        modify_mac dst{};
-        modify_ushort type{};
+        modify_mac src{};                   // Source hardware address
+        modify_mac dst{};                   // Destination hardware address
+        modify_ushort type{};               // Protocol type
 
     protected:
 
@@ -372,11 +358,11 @@ namespace kni {
 
     struct modifyhdr_arp : public modifyhdr_base {
 
-        modify_ushort htype{}, ptype{};
-        modify_uchar hlen{}, plen{};
-        modify_ushort oper{};
-        modify_mac sha{}, tha{};
-        modify_ipv4 spa{}, tpa{};
+        modify_ushort htype{}, ptype{};     // Types of hardware address and protocol address
+        modify_uchar hlen{}, plen{};        // Lengths of hardware address and protocol address
+        modify_ushort oper{};               // ARP operation
+        modify_mac sha{}, tha{};            // Hardware addresses of sender and target
+        modify_ipv4 spa{}, tpa{};           // Protocol addresses of sender and target
 
         modifyhdr_arp() : modifyhdr_base(ARP_HDRLEN) {
 
@@ -399,20 +385,26 @@ namespace kni {
     struct modifyhdr_ipv4 : public modifyhdr_base {
 
         modifybits<4> version{};            // Version
-        modifybits<4> ihl{};                // IHL
+        modifybits<4> ihl{};                // IHL, Internet header length in double-words(4 bytes, 32 bits)
         modify_uchar diff{};                // Differentiated services
-        modify_ushort tot_len{}, id{};      // Total length; Identification
-        modify_flags<3> flags{};            // flags
+        modify_ushort tot_len{}, id{};      // Total length in bytes, and identification
+        modify_flags<3> flags{};            // Flags
         modifybits<13> frag_off{};          // Fragment offset
-        modify_uchar ttl{}, proto{};        // Time to live; Protocol
+        modify_uchar ttl{}, proto{};        // Time to live and next protocol
         modify_ushort check{};              // Header checksum
-        modify_ipv4 src{}, dst{};           // Source address; Destination address
+        modify_ipv4 src{}, dst{};           // Source address and destination address
 
         modifyhdr_ipv4() : modifyhdr_base(IPV4_HDRLEN) {
 
         }
 
     protected:
+        /**
+         * TODO what to do with a zero-length ihl?
+         *
+         * @param buf
+         * @return
+         */
         size_t update_hdr(u_char *buf) override {
             field_begin(buf)(version)(ihl)(diff)(tot_len)
                     (id)(flags)(frag_off)
@@ -456,11 +448,11 @@ namespace kni {
 
     // IPv4 options are not supported to be modified in this way
     struct modifyhdr_tcp : public modifyhdr_base {
-        modify_ushort src{}, dst{};
-        modify_uint seq{}, ack_seq{};
-        modifybits<4> doff{};
-        modify_flags<12> flags{};
-        modify_ushort window{}, check{}, urg_ptr{};
+        modify_ushort src{}, dst{};                     // Source port and destination port
+        modify_uint seq{}, ack_seq{};                   // Sequence number and acknowledgement number
+        modifybits<4> doff{};                           // Data offset in double-words(4 bytes, 32 bits)
+        modify_flags<12> flags{};                       // Reserved bits(3), NS(1) and flags(8)
+        modify_ushort window{}, check{}, urg_ptr{};     // Windows size, header checksum and urgent pointer
 
         modifyhdr_tcp() : modifyhdr_base(TCP_HDRLEN) {
 

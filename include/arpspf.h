@@ -22,17 +22,9 @@ namespace kni {
     class io_packet_base : public buffered_error {
 
     public:
-
-//        io_packet_base(u_char* buf, size_t bsize)
-//                : packet_base(buf, bsize),
-//                  buffered_error(new char[PCAP_BUF_SIZE], PCAP_BUF_SIZE) {
-//
-//        }
         /**
          * Avoid memory management
          *
-         * @param buf
-         * @param size
          * @param ebuf
          * @param esize
          */
@@ -40,6 +32,12 @@ namespace kni {
 
         }
 
+        /**
+         * Open a device
+         *
+         * @param devname
+         * @return
+         */
         inline bool open(const std::string &devname) {
             handle = pcap_open_live(devname.c_str(), 4096, 1, 0, errbuf());
             return handle != nullptr;

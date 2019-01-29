@@ -18,6 +18,11 @@
 
 namespace kni {
 
+    /**
+     *
+     * @param c 0-9a-fA-F
+     * @return an integer[0~15] or -1
+     */
     inline char h2i(char c) {
         if (std::isdigit(c)) {
             return c - '0';
@@ -83,7 +88,7 @@ namespace kni {
             }
         }
 
-        int ttl = 1;
+        int ttl = 1;    // Unable to use the ttl value of 0; setsockopt returns -1
         ret = setsockopt(sender, SOL_IP, IP_TTL, &ttl, sizeof(ttl));
         RETURN_NEGATIVE_ON(ret == -1);
 
