@@ -7,8 +7,7 @@
 #include <linux/tcp.h>
 #include "fields.h"
 
-TEST(ModifyHeader, UpdateEthernet) {
-    /* Frame (14 bytes) */
+TEST(ModifyHeader, EthernetWrite) {
     const u_char pkt[] = {
             0x50, 0x2b, 0x73, 0xdc, 0x54, 0x3f, 0x20, 0x76,
             0x93, 0x3d, 0x8b, 0x57, 0x08, 0x06,
@@ -27,8 +26,7 @@ TEST(ModifyHeader, UpdateEthernet) {
         EXPECT_EQ(pkt[i], buf[i]) << "at byte " << i;
 }
 
-TEST(ModifyHeader, UpdateArp) {
-    /* Frame (28 bytes) */
+TEST(ModifyHeader, ArpWrite) {
     const u_char pkt[] = {
             0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02,
             0x20, 0x76, 0x93, 0x3d, 0x8b, 0x57, 0xc0, 0xa8,
@@ -56,9 +54,33 @@ TEST(ModifyHeader, UpdateArp) {
         EXPECT_EQ(pkt[i], buf[i]) << "at byte " << i;
 }
 
-TEST(ModifyHeader, UpdateIpv4) {
+TEST(ModifyHeader, Ipv4Read) {
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x14, 0xdb, 0x40, 0x00, 0x40, 0x06, /* .<..@.@. */
+            0x8f, 0x5f, 0xc0, 0xa8, 0xe1, 0xb1, 0xcb, 0xd0, /* ._...... */
+            0x28, 0x57,                                      /* .. */
+    };
 
-    /* Frame (123 bytes) */
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+
+    EXPECT_EQ(4, (uint8_t) ipHdr.version);
+    EXPECT_EQ(5, (uint8_t) ipHdr.ihl);
+    EXPECT_EQ(0, (uint8_t) ipHdr.diff);
+    EXPECT_EQ(60, (uint16_t) ipHdr.tot_len);
+    EXPECT_EQ(0x14db, (uint16_t) ipHdr.id);
+    EXPECT_TRUE(ipHdr.flags.isset(kni::DF));
+    EXPECT_EQ(64, (uint8_t) ipHdr.ttl);
+    EXPECT_EQ(0, (uint16_t) ipHdr.frag_off);
+    EXPECT_EQ(IPPROTO_TCP, (uint8_t) ipHdr.proto);
+    EXPECT_EQ(0x8f5f, (uint16_t) ipHdr.check);
+
+    EXPECT_EQ("192.168.225.177", kni::to_string((kni::ipv4_t) ipHdr.src));
+    EXPECT_EQ("203.208.40.87", kni::to_string((kni::ipv4_t) ipHdr.dst));
+}
+
+TEST(ModifyHeader, Ipv4Write) {
     static const u_char pkt[] = {
             0x45, 0xd0, 0x00, 0x6d, 0x43, 0x8c, 0x00, 0x00,
             0x40, 0x01, 0xf2, 0x2f, 0xc0, 0xa8, 0xe1, 0xb1,
@@ -88,7 +110,131 @@ TEST(ModifyHeader, UpdateIpv4) {
         EXPECT_EQ(pkt[i], buf[i]) << "at byte " << i;
 }
 
-TEST(ModifyHeader, UpdateTcpFlagsSYN) {
+TEST(ModifyHeader, Ipv4CalChecksum1) {
+    /*
+     * https://www.thegeekstuff.com/2012/05/ip-header-checksum
+     */
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x1c, 0x46, 0x40, 0x00, 0x40, 0x06, /* .<..@.@. */
+            0xb1, 0xe6, 0xac, 0x10, 0x0a, 0x63, 0xac, 0x10, /* ._...... */
+            0x0a, 0x0c,                                      /* .. */
+    };
+
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+    ipHdr.check = 0;
+    EXPECT_EQ(0xb1e6, ipHdr.cal_check());
+}
+
+TEST(ModifyHeader, Ipv4CalChecksum2) {
+    /*
+     * https://en.m.wikipedia.org/wiki/IPv4_header_checksum
+     */
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x73, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, /* .<..@.@. */
+            0xb8, 0x61, 0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8, /* ._...... */
+            0x00, 0xc7,                                      /* .. */
+    };
+
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+    ipHdr.check = 0;
+    EXPECT_EQ(0xb861, ipHdr.cal_check());
+}
+
+TEST(ModifyHeader, Ipv4CalChecksum3) {
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x14, 0xdb, 0x40, 0x00, 0x40, 0x06, /* .<..@.@. */
+            0x8f, 0x5f, 0xc0, 0xa8, 0xe1, 0xb1, 0xcb, 0xd0, /* ._...... */
+            0x28, 0x57,                                      /* .. */
+    };
+
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+
+    ipHdr.check = 0;
+    EXPECT_EQ(0x8f5f, ipHdr.cal_check());
+}
+
+TEST(ModifyHeader, Ipv4ValidateChecksum1) {
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x14, 0xdb, 0x40, 0x00, 0x40, 0x06, /* .<..@.@. */
+            0x8f, 0x5f, 0xc0, 0xa8, 0xe1, 0xb1, 0xcb, 0xd0, /* ._...... */
+            0x28, 0x57,                                      /* .. */
+    };
+
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+
+    EXPECT_TRUE(ipHdr.validate());
+}
+
+TEST(ModifyHeader, Ipv4ValidateChecksum2) {
+    u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x14, 0xdb, 0x40, 0x00, 0x40, 0x06, /* .<..@.@. */
+            0x8f, 0x5f, 0xc0, 0xa8, 0xe1, 0xb1, 0xcb, 0xd0, /* ._...... */
+            0x28, 0x57,                                      /* .. */
+    };
+
+    kni::modifyhdr_ipv4 ipHdr;
+    ipHdr.update(pkt);
+    ipHdr.set_check();
+    EXPECT_TRUE(ipHdr.validate());
+}
+
+TEST(ModifyHeader, TcpValidateChecksum) {
+
+    u_char pkt[] = {
+            0x9c, 0xfe, 0x01, 0xbb, 0x53, 0xe4, 0x5a, 0xee,
+            0x00, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x72, 0x10,
+            0x94, 0xc3, 0x00, 0x00, 0x02, 0x04, 0x05, 0xb4,
+            0x04, 0x02, 0x08, 0x0a, 0x00, 0x36, 0x5c, 0xe8,
+            0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x07
+    };
+
+    kni::modifyhdr_tcp tcpHdr;
+    tcpHdr.update(pkt);
+
+    u_char pkt0[12];
+
+    kni::pseduo_ipv4 pseduo_ip;
+    pseduo_ip.update(pkt0);
+
+    pseduo_ip.src = "192.168.225.177";
+    pseduo_ip.dst = "203.208.40.87";
+    pseduo_ip.rsv = 0;
+    pseduo_ip.tcp_len = 40;
+
+
+    EXPECT_TRUE(tcpHdr.validate(pkt0, sizeof(pkt0)));
+}
+
+TEST(ModifyHeader, TcpRead) {
+    u_char pkt[] = {
+            0x9c, 0xfe, 0x01, 0xbb, 0x53, 0xe4, 0x5a, 0xee,
+            0x00, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x72, 0x10,
+            0x94, 0xc3, 0x00, 0x00,
+    };
+
+    kni::modifyhdr_tcp tcpHdr;
+    tcpHdr.update(pkt);
+
+    EXPECT_EQ(40190, (uint16_t) tcpHdr.src);
+    EXPECT_EQ(443, (uint16_t) tcpHdr.dst);
+    EXPECT_EQ(0x53e45aee, (uint32_t) tcpHdr.seq);
+    EXPECT_EQ(0, (uint32_t) tcpHdr.ack_seq);
+    EXPECT_EQ(10, (uint8_t) tcpHdr.doff);
+    EXPECT_TRUE(tcpHdr.flags.isset(kni::SYN));
+    EXPECT_EQ(29200, (uint16_t) tcpHdr.window);
+    EXPECT_EQ(0, (uint16_t) tcpHdr.urg_ptr);
+}
+
+TEST(ModifyHeader, TcpWriteSYN) {
     const u_char pkt[] = {
             0x9c, 0xfe, 0x01, 0xbb, 0x53, 0xe4, 0x5a, 0xee,
             0x00, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x72, 0x10,
@@ -105,7 +251,7 @@ TEST(ModifyHeader, UpdateTcpFlagsSYN) {
     tcpHdr.seq = 0x53e45aee;
     tcpHdr.ack_seq = 0x00000000;
     tcpHdr.doff = 10;
-    tcpHdr.flags.set(kni::tcp_flags::SYN);
+    tcpHdr.flags.set(kni::SYN);
 
     tcpHdr.window = 29200;
     tcpHdr.check = 0x94c3;
@@ -115,8 +261,7 @@ TEST(ModifyHeader, UpdateTcpFlagsSYN) {
         EXPECT_EQ(pkt[i], buf[i]) << "at byte " << i;
 }
 
-TEST(ModifyHeader, UpdateTcpFlagsRST) {
-    /* Frame (54 bytes) */
+TEST(ModifyHeader, TcpWriteRST) {
     const unsigned char pkt[20] = {
             0x00, 0x50, 0xea, 0xaa, 0x0d, 0xda, 0x55, 0xe2,
             0x7b, 0x8d, 0xf5, 0x31, 0x50, 0x04, 0x04, 0x00,
@@ -133,7 +278,7 @@ TEST(ModifyHeader, UpdateTcpFlagsRST) {
     tcpHdr.seq = 0x0dda55e2;
     tcpHdr.ack_seq = 0x7b8df531;
     tcpHdr.doff = 5;
-    tcpHdr.flags.set(kni::tcp_flags::RST);
+    tcpHdr.flags.set(kni::RST);
 
     tcpHdr.window = 1024;
     tcpHdr.check = 0xa56f;

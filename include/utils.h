@@ -8,17 +8,45 @@
 
 #include <memory>
 #include <cstring>
+#include <cassert>
 
 namespace kni {
 
     inline int count_bits(unsigned int n) {
         int count = 0;
         while (n) {
-            if (n & 0x1)
+            if (n & 0x1) // NOLINT
                 count++;
             n >>= 1;
         }
         return count;
+    }
+
+    inline uint32_t sum_all_words(const void *buf, size_t bytes) {
+        assert(bytes % 2 == 0);
+
+        uint32_t tmp = 0;
+
+        auto w = (uint16_t *) buf;
+        auto wc = bytes / 2;
+
+        for (int i = 0; i < wc; ++i) {
+            tmp += ntohs(w[i]); // tmp < 0x0001FFFF due to 2 * 0x0000FFFF(maximum of uint16_t) = 0x0001FFFE
+            tmp = (0x0000FFFF & tmp) + (tmp >> 16); // NOLINT
+        }
+
+        return tmp;
+    }
+
+    /**
+     * Add up all 16-bit words using one's complement arithmetic and flip the result
+     *
+     * @param buf
+     * @param bytes
+     * @return
+     */
+    inline uint16_t compute_check(const void *buf, size_t bytes) {
+        return static_cast<uint16_t>(~sum_all_words(buf, bytes));
     }
 
 //    class observer {

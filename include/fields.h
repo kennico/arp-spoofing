@@ -9,8 +9,46 @@
 #include <arpa/inet.h>
 
 #include "pkt.h"
+#include "utils.h"
 
 namespace kni {
+
+    class fld_length {
+    public:
+        fld_length() = default;
+
+        explicit fld_length(size_t byte) : nbytes(byte) {
+
+        }
+
+        fld_length(size_t byte, size_t bit) : nbits(bit % 8), nbytes(byte + bit / 8) {
+
+        }
+
+        inline fld_length &operator+=(const fld_length &other) noexcept {
+            nbits += other.nbits;
+            nbytes += other.nbytes + nbits / 8;
+            nbits %= 8;
+
+            return *this;
+        }
+
+        inline size_t bytes() const noexcept {
+            return nbytes;
+        }
+
+        inline size_t bits() const noexcept {
+            return nbits;
+        }
+
+    private:
+
+        size_t nbytes{0}, nbits{0};
+    };
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
+#pragma ide diagnostic ignored "OCUnusedStructInspection"
 
     class modifyfld_base {
     public:
@@ -19,39 +57,12 @@ namespace kni {
             return from_ptr;
         }
 
+        inline void bind(u_char *buf) noexcept {
+            from_ptr = buf;
+        }
+
     protected:
         u_char *from_ptr;
-    };
-
-    class hdr_builder {
-    public:
-
-        explicit hdr_builder(u_char *buf_) : buf(buf_) {
-
-        }
-
-        template<typename Field>
-        inline hdr_builder &operator()(Field &field) noexcept {
-            field.accept_from(*this);
-
-            buf += step_bytes;
-            buf += step_bits / 8;
-
-            step_bytes = 0;
-            step_bits %= 8;
-
-            return *this;
-        }
-
-        inline u_char *buffer() noexcept {
-            return buf;
-        }
-
-    private:
-        u_char *buf{nullptr};
-
-    public:
-        size_t step_bits{0}, step_bytes{0};
     };
 
     template<typename network_type>
@@ -62,14 +73,97 @@ namespace kni {
             return sizeof(network_type);
         }
 
-        inline void accept_from(hdr_builder &builder) noexcept {
-            assert(builder.step_bits == 0);
 
-            from_ptr = builder.buffer();
-            builder.step_bytes += bytes();
+        inline constexpr fld_length length() const noexcept {
+            return fld_length(bytes());
+        }
+
+        inline void set_off(const fld_length &len) noexcept {}
+
+    };
+
+    template<typename network_type>
+    struct endian_bytes_traits;
+
+    template<>
+    struct endian_bytes_traits<uint8_t> {
+        using bytes_type = uint8_t;
+
+        inline static bytes_type hton(bytes_type hostchar) noexcept {
+            return hostchar;
+        }
+
+        inline static bytes_type ntoh(bytes_type netchar) noexcept {
+            return netchar;
         }
     };
 
+    template<>
+    struct endian_bytes_traits<uint16_t> {
+        using bytes_type = uint16_t;
+
+        inline static bytes_type hton(bytes_type hostshort) noexcept {
+            return htons(hostshort);
+        }
+
+        inline static bytes_type ntoh(bytes_type netshort) noexcept {
+            return ntohs(netshort);
+        }
+    };
+
+    template<>
+    struct endian_bytes_traits<uint32_t> {
+        using bytes_type = uint32_t;
+
+        inline static bytes_type hton(bytes_type hostlong) noexcept {
+            return htonl(hostlong);
+        }
+
+        inline static bytes_type ntoh(bytes_type netlong) noexcept {
+            return ntohl(netlong);
+        }
+    };
+
+    /**
+     * IPv4, IPv6 and MAC address type don't inherit this class and therefore
+     * explicit casting are not supported for these types currently.
+     *
+     *
+     * @tparam network_type
+     * @tparam endian_traits
+     */
+    template<typename network_type,
+            typename endian_traits=endian_bytes_traits<network_type>>
+    class modify_unsigned : public modifybytes<network_type> {
+    public:
+
+        using bytes_type = typename endian_traits::bytes_type;
+
+        inline modify_unsigned<network_type, endian_traits> &operator=(bytes_type unsgn) {
+            /*
+             * *(bytes_type*)(from_ptr) = endian_traits::hton(unsgn);
+             * error: ‘from_ptr’ was not declared in this scope
+             *
+             * See https://stackoverflow.com/a/12032373/8706476
+             */
+            *(bytes_type *) (this->from_ptr) = endian_traits::hton(unsgn);
+            return *this;
+        };
+
+        inline explicit operator bytes_type() const {
+            /*
+             * return endian_traits::ntoh(*(bytes_type*)(data()))
+             * error: there are no arguments to ‘data’ that depend on a template parameter
+             *
+             * See https://stackoverflow.com/a/12032373/8706476
+             */
+            return endian_traits::ntoh(*(bytes_type *) (this->data()));
+        }
+    };
+
+    using modify_uchar  = modify_unsigned<uint8_t>;
+    using modify_ushort = modify_unsigned<uint16_t>;
+    using modify_ulong  = modify_unsigned<uint32_t>;
 
     template<size_t nbytes>
     struct padding_bytes_traits;
@@ -77,59 +171,43 @@ namespace kni {
     template<>
     struct padding_bytes_traits<1> {
         using padding_type = uint8_t;
-
-        inline static padding_type hton(padding_type v) noexcept {
-            return v;
-        }
     };
 
     template<>
     struct padding_bytes_traits<2> {
         using padding_type = uint16_t;
-
-        inline static padding_type hton(padding_type v) noexcept {
-            return htons(v);
-        }
     };
 
     template<>
     struct padding_bytes_traits<3> {
         using padding_type = uint32_t;
-
-        inline static padding_type hton(padding_type v) noexcept {
-            return htonl(v);
-        }
     };
 
     template<>
     struct padding_bytes_traits<4> {
         using padding_type = uint32_t;
-
-        inline static padding_type hton(padding_type v) noexcept {
-            return htonl(v);
-        }
     };
 
     /**
      *
      * @tparam nbits (0, 32]
-     * @tparam padding_traits provides a type named padding_type
+     * @tparam padding_traits provides padding_type
+     * @tparam endian_traits
      */
     template<size_t nbits,
-            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>>
+            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>,
+            typename endian_traits  = endian_bytes_traits<typename padding_traits::padding_type>>
     class modifybits : public modifyfld_base {
-
-    private:
-        const static size_t BITS_MAXLEN = sizeof(uint32_t) * 8;
-
     public:
+        const static size_t BITS_MAXLEN = sizeof(uint32_t) * 8;
 
         using padding_type = typename padding_traits::padding_type;
 
-        static_assert(std::is_unsigned<padding_type>::value, "unsigned required");
         static_assert(nbits <= BITS_MAXLEN, "Length limit exceeded");
         static_assert(nbits != 0, "Zero length");       // 0 < nbits <= 32
+        static_assert(std::is_unsigned<padding_type>::value, "unsigned required");
 
+    public:
 
         modifybits() : modifyfld_base() {
 
@@ -139,45 +217,44 @@ namespace kni {
             return nbits;
         }
 
+        inline constexpr fld_length length() const noexcept {
+            return fld_length(0, bits());
+        }
         /**
          *
          * @param value aligned to LSB
          * @return
          */
-        inline modifybits<nbits, padding_traits> &operator=(padding_type value) noexcept {
+        inline modifybits<nbits, padding_traits, endian_traits> &
+        operator=(padding_type value) noexcept {
+
             *(padding_type *) from_ptr = (
                     ((*(padding_type *) from_ptr) & n_inv_mask) |
-                    padding_traits::hton(value << r_align));
+                    endian_traits::hton(value << r_align));
 
             return *this;
         };
 
-        inline void accept_from(hdr_builder &builder) noexcept {
-            from_ptr = builder.buffer();
-
-            off = builder.step_bits;
+        inline void set_off(const fld_length &offset) {
+            off = offset.bits();
             assert(off + bits() <= BITS_MAXLEN);
-            builder.step_bits += bits();
 
-            // how many bytes does it occupy since from_ptr?
-            auto byt = 1 + (off + bits() - 1) / 8;
+            auto byt = 1 + (off + bits() - 1) / 8; // How many bytes does it occupy since from_ptr?
             assert(byt > 0 && byt < 4);
             assert(sizeof(padding_type) == byt);
 
-            // how many bits should i left-shift the value?
-            r_align = byt * 8 - (off + bits());
-            assert(r_align < 8);
+            r_align = byt * 8 - (off + bits()); // How many bits should I left-shift the value?
 
             auto mask = (padding_type) 0xFFFFFFFF;
             mask = (mask << (r_align + bits())) | ~(mask << r_align);   // NOLINT
-            n_inv_mask = padding_traits::hton(mask);
+            n_inv_mask = endian_traits::hton(mask);
         }
 
         /*
          * Should i avoid implicit cast?
          */
         inline explicit operator padding_type() const noexcept {
-            return ((*(padding_type *) data()) & (~n_inv_mask)) >> r_align;                // NOLINT
+            return (*(padding_type *) data() & (~n_inv_mask)) >> r_align;                // NOLINT
         }
 
     private:
@@ -188,52 +265,39 @@ namespace kni {
     };
 
     template<size_t nbits,
-            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>>
-    class modify_flags : public modifybits<nbits, padding_traits> {
+            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>,
+            typename endian_traits  = endian_bytes_traits<typename padding_traits::padding_type>>
+    class modify_flags :
+            public modifybits<nbits, padding_traits, endian_traits> {
+
     public:
-        using padding_type = typename modifybits<nbits, padding_traits>::padding_type;
+        using parent_type  = modifybits<nbits, padding_traits, endian_traits>;
+        using padding_type = typename parent_type::padding_type;
+        /*
+         * Name hiding - error: no match for ‘operator=’
+         *
+         * Using-declaration "won't be a good style" to unhide the inherited operator.
+         * Re-declaring operator= also works.
+         *
+         * https://stackoverflow.com/a/3882455/8706476
+         * https://stackoverflow.com/a/1629074/8706476
+         */
+        using parent_type::operator=;
+
+    public:
 
         inline void set(padding_type flags) {
             modifybits<nbits, padding_traits>::operator=(padding_type() | flags);
         }
 
         inline bool isset(padding_type flags) {
-            return padding_type() & flags;
+            return (padding_type) (*this) & endian_traits::hton(flags);
         }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "HidingNonVirtualFunction"
-
-        inline modify_flags<nbits, padding_traits> &operator=(padding_type value) {
-            modifybits<nbits, padding_traits>::operator=(value);
-            return *this;
-        };
-#pragma clang diagnostic pop
     };
 
-    struct modify_uchar : public modifybytes<uint8_t> {
 
-        inline modify_uchar &operator=(uint8_t uc) {
-            *from_ptr = uc;
-            return *this;
-        }
-    };
-
-    struct modify_ushort : public modifybytes<uint16_t> {
-        inline modify_ushort &operator=(uint16_t uh) {
-            *(u_short *) from_ptr = htons(uh);
-            return *this;
-        }
-    };
-
-    struct modify_uint : public modifybytes<uint32_t> {
-        inline modify_uint &operator=(uint32_t ui) {
-            *(u_int *) from_ptr = htonl(ui);
-            return *this;
-        }
-    };
-
-    // TODO should modify_ipv4 derive from modify_uint?
+    // TODO should modify_ipv4 derive from modify_ulong?
     struct modify_ipv4 : public modifybytes<ipv4_t> {
         inline modify_ipv4 &operator=(ipv4_t addr) {
             *(ipv4_t *) from_ptr = addr;
@@ -248,6 +312,10 @@ namespace kni {
         inline modify_ipv4 &operator=(const char *ip) {
             assert(inet_pton(AF_INET, ip, from_ptr));
             return *this;
+        }
+
+        inline explicit operator ipv4_t() const noexcept {
+            return *(ipv4_t *) data();
         }
     };
 
@@ -291,9 +359,35 @@ namespace kni {
         }
     };
 
-
+#pragma clang diagnostic pop
 
     class modifyhdr_base {
+
+    private:
+        class hdr_builder {
+        public:
+
+            explicit hdr_builder(u_char *buf_) : buf(buf_) {
+
+            }
+
+            template<typename Field>
+            inline hdr_builder &operator()(Field &field) noexcept {
+                field.set_off(acc_len());
+                field.bind(buf + len.bytes());
+                len += field.length();
+
+                return *this;
+            }
+
+            inline const fld_length &acc_len() const noexcept {
+                return len;
+            }
+
+        private:
+            u_char *buf{nullptr};
+            fld_length len{};
+        };
 
     public:
         /**
@@ -381,6 +475,13 @@ namespace kni {
 
     };
 
+    /**
+     * IPv4 flags
+     */
+    enum {
+        MF = 0b001, DF = 0b010,
+    };
+
     // IPv4 options are not supported to be modified in this way
     struct modifyhdr_ipv4 : public modifyhdr_base {
 
@@ -396,6 +497,24 @@ namespace kni {
 
         modifyhdr_ipv4() : modifyhdr_base(IPV4_HDRLEN) {
 
+        }
+
+    public:
+
+        inline bool validate() const {
+            return cal_check() == 0;
+        }
+
+        inline uint16_t cal_check() const {
+            return compute_check(version.data(), static_cast<size_t>((uint8_t) ihl * 4));
+        }
+
+        /**
+         * Firstly it sets check to zero and therefore clears the old checksum
+         */
+        inline void set_check() {
+            check = 0;
+            check = cal_check();
         }
 
     protected:
@@ -415,47 +534,67 @@ namespace kni {
         }
     };
 
-//    struct modifyhdr_ipv6 : public modifyhdr_base {
-//
-//        modifybits<4> version{};
-//        modifybits<8> traffic{};
-//        modifybits<20> flow{};
-//        modify_ushort payload_len{};
-//        modify_uchar next{}, hop_lim{};
-//        modify_ipv6 src{}, dst{};
-//
-//        modifyhdr_ipv6() : modifyhdr_base(IPV6_HDRLEN) {
-//
-//        }
-//
-//    protected:
-//
-//        size_t update_hdr(u_char* buf) override {
-//            field_begin(buf)(version)(traffic)(flow)
-//                    (payload_len)(next)(hop_lim)
-//                    (src)(dst);
-//
-//            static_assert(false, "Not implemented");
-//            return IPV6_HDRLEN;
-//        }
-//    };
-
-    enum tcp_flags {
+    /**
+     * TCP flags
+     */
+    enum {
         FIN = 0x001, SYN = 0x002, RST = 0x004, PSH = 0x008,
         ACK = 0x010, URG = 0x020, ECE = 0x040, CWR = 0x080,
         NCE = 0x100
     };
 
+    struct pseduo_ipv4 : public modifyhdr_base {
+        pseduo_ipv4() : modifyhdr_base(12) {
+
+        }
+
+        modify_ipv4 src{}, dst{};
+        modify_uchar rsv{}, proto{};
+        modify_ushort tcp_len{};
+
+        size_t update_hdr(u_char *buf) override {
+            field_begin(buf)(src)(dst)(rsv)(proto)(tcp_len);
+            rsv = 0;
+            proto = IPPROTO_TCP;
+
+            return 12;
+        }
+
+    };
+
     // IPv4 options are not supported to be modified in this way
     struct modifyhdr_tcp : public modifyhdr_base {
         modify_ushort src{}, dst{};                     // Source port and destination port
-        modify_uint seq{}, ack_seq{};                   // Sequence number and acknowledgement number
+        modify_ulong seq{}, ack_seq{};                  // Sequence number and acknowledgement number
         modifybits<4> doff{};                           // Data offset in double-words(4 bytes, 32 bits)
         modify_flags<12> flags{};                       // Reserved bits(3), NS(1) and flags(8)
         modify_ushort window{}, check{}, urg_ptr{};     // Windows size, header checksum and urgent pointer
 
         modifyhdr_tcp() : modifyhdr_base(TCP_HDRLEN) {
 
+        }
+
+    public:
+
+        /**
+         *
+         * @param pseudo
+         * @return
+         */
+        inline bool validate(const void *pseudo, size_t bytes) const {
+            return cal_check(pseudo, bytes) == 0;
+        }
+
+        inline uint16_t cal_check(const void *pseudo, size_t bytes) const {
+            uint32_t cks = sum_all_words(src.data(), static_cast<size_t>((uint8_t) doff * 4));
+            uint32_t a = sum_all_words(pseudo, bytes);
+            cks += a;
+            return ~static_cast<uint16_t>((cks & 0x0000FFFF) + (cks >> 16));
+        }
+
+        inline void set_check(const void *pseudo, size_t bytes) {
+            check = 0;
+            check = cal_check(pseudo, bytes);
         }
 
     protected:
