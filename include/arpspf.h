@@ -9,7 +9,6 @@
 
 #include <sys/socket.h>
 #include <linux/if_arp.h>
-//#include <linux/if_ether.h>
 
 #include "netinfo.h"
 #include "pkt.h"
@@ -92,6 +91,7 @@ namespace kni {
         }
 
         /**
+         * Send an ARP reply
          *
          * @param sender_ip sender's protocol(ip) address
          * @param sender_mac sender's hardware address

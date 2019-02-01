@@ -22,10 +22,10 @@ namespace kni {
         return count;
     }
 
-    inline uint32_t sum_all_words(const void *buf, size_t bytes) {
+    inline uint16_t sum_all_words(const void *buf, size_t bytes, uint16_t sum = 0) {
         assert(bytes % 2 == 0);
 
-        uint32_t tmp = 0;
+        uint32_t tmp = sum;
 
         auto w = (uint16_t *) buf;
         auto wc = bytes / 2;
@@ -35,7 +35,7 @@ namespace kni {
             tmp = (0x0000FFFF & tmp) + (tmp >> 16); // NOLINT
         }
 
-        return tmp;
+        return static_cast<uint16_t>(tmp);
     }
 
     /**
@@ -46,67 +46,8 @@ namespace kni {
      * @return
      */
     inline uint16_t compute_check(const void *buf, size_t bytes) {
-        return static_cast<uint16_t>(~sum_all_words(buf, bytes));
+        return (~sum_all_words(buf, bytes));
     }
-
-//    class observer {
-//    public:
-//
-//        observer(u_char* buf_, size_t size_) : buffer(buf_), size(size_) {
-//
-//        }
-//
-//    public:
-//
-//        inline const u_char * buf() const noexcept {
-//            return buffer;
-//        }
-//
-//        inline u_char * buf() noexcept {
-//            return buffer;
-//        }
-//
-//        inline size_t bufsize() const noexcept {
-//            return size;
-//        }
-//
-//    private:
-//
-//        u_char * buffer;
-//        size_t size;
-//
-//    };
-//
-//    class auto_buf {
-//    public:
-//
-//        explicit auto_buf(size_t size_): mem(new u_char[size]), size(size_) {
-//
-//        }
-//
-////        auto_buf(auto_buf&&) = default; // https://stackoverflow.com/a/18290839/8706476
-//
-//        auto_buf(auto_buf&& b) : mem(std::move(b.mem)), size(b.size) {
-//            printf("move\n");
-//        }
-//
-//        inline const u_char * buf() const noexcept {
-//            return mem.get();
-//        }
-//
-//        inline u_char * buf() noexcept {
-//            return mem.get();
-//        }
-//
-//
-//        inline size_t bufsize() const noexcept {
-//            return size;
-//        }
-//
-//    private:
-//        std::unique_ptr<u_char[]> mem;
-//        size_t size{};
-//    };
 
     class buffered_error {
     public:
@@ -122,6 +63,10 @@ namespace kni {
             return bufsize;
         }
 
+        /**
+         * Retrieve and store library or system error information via errno
+         * @return a buffer containing error information
+         */
         inline const char *getsyserr() noexcept {
             strerror_r(errno, errbuf(), errbufsize());
             return errbuf();

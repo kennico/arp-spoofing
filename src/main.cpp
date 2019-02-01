@@ -18,8 +18,6 @@
 
 using namespace kni;
 
-#define APP_NAME "arpspf"
-
 void *thread_spoof(void *);
 
 typedef void (*arpspf_func)(int, char *[]);
@@ -63,11 +61,9 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[1], "lo") == 0)
         KNI_FATAL_ERROR("using lo doesn't make sense");
 
+    std::unique_ptr<char[]> errbuf(new char[PCAP_ERRBUF_SIZE]);
 
-    const size_t errbufsize = 1024;
-    std::unique_ptr<char[]> errbuf(new char[errbufsize]);
-
-    netdb = new netinfo(errbuf.get(), errbufsize);
+    netdb = new netinfo(errbuf.get(), PCAP_ERRBUF_SIZE);
     if (!netdb->set_dev(argv[1]) || !netdb->update_gateway_ip())
         KNI_FATAL_ERROR(netdb->error());
 

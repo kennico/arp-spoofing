@@ -200,18 +200,45 @@ TEST(ModifyHeader, TcpValidateChecksum) {
     kni::modifyhdr_tcp tcpHdr;
     tcpHdr.update(pkt);
 
-    u_char pkt0[12];
+    u_char buf[12];
 
-    kni::pseduo_ipv4 pseduo_ip;
-    pseduo_ip.update(pkt0);
+    kni::pseudo_ipv4 pseudo_ip;
+    pseudo_ip.update(buf);
 
-    pseduo_ip.src = "192.168.225.177";
-    pseduo_ip.dst = "203.208.40.87";
-    pseduo_ip.rsv = 0;
-    pseduo_ip.tcp_len = 40;
+    pseudo_ip.src = "192.168.225.177";
+    pseudo_ip.dst = "203.208.40.87";
+    pseudo_ip.rsv = 0;
+    pseudo_ip.tcp_len = 40;
 
 
-    EXPECT_TRUE(tcpHdr.validate(pkt0, sizeof(pkt0)));
+    EXPECT_TRUE(tcpHdr.validate(buf, sizeof(buf)));
+}
+
+TEST(ModifyHeader, TcpValidateChecksum2) {
+    u_char pkt[] = {
+            0x9c, 0xfe, 0x01, 0xbb, 0x53, 0xe4, 0x5a, 0xee,
+            0x00, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x72, 0x10,
+            0x94, 0xc3, 0x00, 0x00, 0x02, 0x04, 0x05, 0xb4,
+            0x04, 0x02, 0x08, 0x0a, 0x00, 0x36, 0x5c, 0xe8,
+            0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x07
+    };
+
+    kni::modifyhdr_tcp tcpHdr;
+    tcpHdr.update(pkt);
+
+    u_char buf[12];
+
+    kni::pseudo_ipv4 pseudo_ip;
+    pseudo_ip.update(buf);
+
+    pseudo_ip.src = "192.168.225.177";
+    pseudo_ip.dst = "203.208.40.87";
+    pseudo_ip.rsv = 0;
+    pseudo_ip.tcp_len = 40;
+
+    tcpHdr.check = 0;
+    tcpHdr.set_check(buf, sizeof(buf));
+    EXPECT_TRUE(tcpHdr.validate(buf, sizeof(buf)));
 }
 
 TEST(ModifyHeader, TcpRead) {

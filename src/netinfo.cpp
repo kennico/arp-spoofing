@@ -7,18 +7,20 @@
 #include "netinfo.h"
 #include "fields.h"
 
-
+/*
+ * Perform LAN host discovery using nmap
+ */
 constexpr auto fmt_nmap_lan = "nmap -sn %s/%d";
 constexpr auto grep_ip_mac = R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
 
 namespace kni {
 
     bool netinfo::update_arp() {
-        auto netmask = *(unsigned int *) &devinfo.ip_netmask;
-        netmask = ntohl(netmask);
+        auto subnet_mask = *(unsigned int *) &devinfo.ip_netmask;
+        subnet_mask = ntohl(subnet_mask);
 
         char script_line[128];
-        sprintf(script_line, fmt_nmap_lan, to_string(devinfo.ip).c_str(), count_bits(netmask));
+        sprintf(script_line, fmt_nmap_lan, to_string(devinfo.ip).c_str(), count_bits(subnet_mask));
         sprintf(script_line + strlen(script_line), " | %s", grep_ip_mac);
         KNI_LOG_DEBUG("Command: %s", script_line);
 

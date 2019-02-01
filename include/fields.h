@@ -202,16 +202,12 @@ namespace kni {
         const static size_t BITS_MAXLEN = sizeof(uint32_t) * 8;
 
         using padding_type = typename padding_traits::padding_type;
-
+        // 0 < nbits <= 32
         static_assert(nbits <= BITS_MAXLEN, "Length limit exceeded");
-        static_assert(nbits != 0, "Zero length");       // 0 < nbits <= 32
+        static_assert(nbits != 0, "Zero length");
         static_assert(std::is_unsigned<padding_type>::value, "unsigned required");
 
     public:
-
-        modifybits() : modifyfld_base() {
-
-        }
 
         inline constexpr size_t bits() const noexcept {
             return nbits;
@@ -226,11 +222,9 @@ namespace kni {
          * @return
          */
         inline modifybits<nbits, padding_traits, endian_traits> &
-        operator=(padding_type value) noexcept {
-
+        operator=(padding_type value) {
             *(padding_type *) from_ptr = (
-                    ((*(padding_type *) from_ptr) & n_inv_mask) |
-                    endian_traits::hton(value << r_align));
+                    ((*(padding_type *) from_ptr) & n_inv_mask) | endian_traits::hton(value << r_align));
 
             return *this;
         };
@@ -253,7 +247,7 @@ namespace kni {
         /*
          * Should i avoid implicit cast?
          */
-        inline explicit operator padding_type() const noexcept {
+        inline explicit operator padding_type() const {
             return (*(padding_type *) data() & (~n_inv_mask)) >> r_align;                // NOLINT
         }
 
@@ -287,7 +281,7 @@ namespace kni {
     public:
 
         inline void set(padding_type flags) {
-            modifybits<nbits, padding_traits>::operator=(padding_type() | flags);
+            parent_type::operator=((padding_type) (*this) | flags);
         }
 
         inline bool isset(padding_type flags) {
@@ -543,13 +537,18 @@ namespace kni {
         NCE = 0x100
     };
 
-    struct pseduo_ipv4 : public modifyhdr_base {
-        pseduo_ipv4() : modifyhdr_base(12) {
+    struct pseudo_ipv4 : public modifyhdr_base {
+        pseudo_ipv4() : modifyhdr_base(12) {
 
         }
 
         modify_ipv4 src{}, dst{};
         modify_uchar rsv{}, proto{};
+        /*
+         * This field is not presented in a TCP header. Instead, it is derived from an IP header
+         *
+         * tcp_len = ip.tot_len - ip.ihl * 4 measured in bytes.
+         */
         modify_ushort tcp_len{};
 
         size_t update_hdr(u_char *buf) override {
@@ -586,10 +585,9 @@ namespace kni {
         }
 
         inline uint16_t cal_check(const void *pseudo, size_t bytes) const {
-            uint32_t cks = sum_all_words(src.data(), static_cast<size_t>((uint8_t) doff * 4));
-            uint32_t a = sum_all_words(pseudo, bytes);
-            cks += a;
-            return ~static_cast<uint16_t>((cks & 0x0000FFFF) + (cks >> 16));
+            return ~sum_all_words(
+                    src.data(),
+                    static_cast<size_t>((uint8_t) doff * 4), sum_all_words(pseudo, bytes));
         }
 
         inline void set_check(const void *pseudo, size_t bytes) {
@@ -613,6 +611,11 @@ namespace kni {
     class modifypkt_base {
     public:
 
+        /**
+         * Update the binding pointer of each header
+         *
+         * @param buf
+         */
         virtual void update_input(u_char *buf) {
             buffer = buf;
             for (auto hdr : headers) {
@@ -666,9 +669,5 @@ namespace kni {
         }
 
     };
-
-//    struct modifypkt_ip : public modifypkt_base {
-//
-//    };
 
 }

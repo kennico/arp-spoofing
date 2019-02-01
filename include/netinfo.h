@@ -19,7 +19,7 @@ namespace kni {
      * @param dev device name
      * @param attempts
      * @param ms time interval between two attempts
-     * @return
+     * @return an ip address in network byte order if success; else -1 on failure and error info can be retrieved via errno
      */
     int get_gateway_ip(const char *dev = nullptr, int attempts = 5, int ms = 50);
 
@@ -77,5 +77,12 @@ namespace kni {
 
     };
 
+    /**
+     *
+     * @param devname
+     * @param pinfo a pointer to devinfo_t struct where info will be stored
+     * @param errbuf
+     * @return
+     */
     int get_device_info(const char *devname, devinfo_t *pinfo, char *errbuf);
 }
