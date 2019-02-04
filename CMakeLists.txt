@@ -17,18 +17,22 @@ include(find_libpcap.cmake)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-set(COMMON_SOURCE
-        include/arpspf.h
+set(PKTHDRS
+        include/fields.h
         include/netinfo.h
         include/pkt.h
-        src/hdrs.h
-        include/fields.h
-        src/misc.cpp src/gateway.cpp src/netinfo.cpp include/utils.h)
+        include/utils.h
+        src/gateway.cpp src/hdrs.h src/misc.cpp src/netinfo.cpp)
 
-
-add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
+add_executable(arpspf
+        include/arpspf.h
+        src/pthargs.h
+        src/main.cpp
+        ${PKTHDRS} src/pth-spoof.cpp src/pth-hjiack-http.cpp include/refactored-fields.h)
 target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
-add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE} test/usage-unique_ptr.cpp test/header-test.cpp test/tmpl_traits-test.cpp)
+add_executable(arpspf-test
+        test/usage-unique_ptr.cpp test/header-test.cpp test/tmpl_traits-test.cpp
+        ${PKTHDRS} test/usage-libpcap.cpp test/refactored_fields-test.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 

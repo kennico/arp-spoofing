@@ -176,7 +176,7 @@ namespace kni2 {
 
     /*
      * template <typename unsigned_type, typename endianness>
-     *     class unsigned_integer<unsigned_type, write_access, endianness>: ...
+     *     class field_unsigned<unsigned_type, write_access, endianness>: ...
      *
      * error: default template arguments may not be used in partial specialization
      * https://stackoverflow/a/18701381/8706476

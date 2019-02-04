@@ -17,7 +17,7 @@
 
 namespace kni {
 
-
+#if 0
     class io_packet_base : public buffered_error {
 
     public:
@@ -48,6 +48,9 @@ namespace kni {
             handle = nullptr;
         }
 
+        inline const u_char * next(pcap_pkthdr* pkthdr) {
+            return pcap_next(handle, pkthdr);
+        }
 
     protected:
 
@@ -114,5 +117,5 @@ namespace kni {
         }
 
     };
-
+#endif
 }

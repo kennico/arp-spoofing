@@ -12,7 +12,9 @@
 #define ETHER_HDRLEN    14
 #define ARP_HDRLEN      28
 #define IPV4_HDRLEN     20 // no options
+#define IPV4_MAX_HDRLEN 60
 #define TCP_HDRLEN      40 // no options
+#define TCP_MAX_HDRLEN  60
 #define IPV6_HDRLEN     40
 
 namespace kni {
