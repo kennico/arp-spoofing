@@ -5,7 +5,6 @@
 #include "hdrs.h"
 #include "utils.h"
 #include "netinfo.h"
-#include "fields.h"
 
 /*
  * Perform LAN host discovery using nmap

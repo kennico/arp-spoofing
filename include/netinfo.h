@@ -9,7 +9,6 @@
 
 #include "pkt.h"
 #include "utils.h"
-#include "fields.h"
 
 namespace kni {
 

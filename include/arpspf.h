@@ -12,7 +12,6 @@
 
 #include "netinfo.h"
 #include "pkt.h"
-#include "fields.h"
 #include "utils.h"
 
 namespace kni {
@@ -65,54 +64,54 @@ namespace kni {
         pcap_t *handle{nullptr};
     };
 
-    class arp_io_packet :
-            public io_packet_base,
-            public modifypkt_arp {
-    public:
-        arp_io_packet(char *ebuf, size_t esize)
-                : io_packet_base(ebuf, esize), modifypkt_arp() {
-
-        }
-
-        template<size_t esize>
-        explicit arp_io_packet(char (&ebuf)[esize]) : arp_io_packet(ebuf, esize) {
-
-        }
-
-        void update_input(u_char *buf) override {
-            modifypkt_base::update_input(buf);
-
-            arpHdr.htype = ARPHRD_ETHER;
-            arpHdr.ptype = ETH_P_IP;
-            arpHdr.hlen = 6;
-            arpHdr.plen = 4;
-
-            ethHdr.type = ETH_P_ARP;
-        }
-
-        /**
-         * Send an ARP reply
-         *
-         * @param sender_ip sender's protocol(ip) address
-         * @param sender_mac sender's hardware address
-         * @param target_ip target's protocol(ip) address
-         * @param target_mac target's hardware address
-         * @return
-         */
-        inline bool reply(const std::string &sender_ip, const mac_t &sender_mac, const std::string &target_ip,
-                          const mac_t &target_mac) {
-            arpHdr.spa = sender_ip;
-            arpHdr.sha = sender_mac;
-            arpHdr.tpa = target_ip;
-            arpHdr.tha = target_mac;
-            arpHdr.oper = ARPOP_REPLY;
-
-            ethHdr.src = sender_mac;
-            ethHdr.dst = target_mac;
-
-            return send_packet(content(), ETHER_HDRLEN + ARP_HDRLEN);
-        }
-
-    };
+//    class arp_io_packet :
+//            public io_packet_base,
+//            public modifypkt_arp {
+//    public:
+//        arp_io_packet(char *ebuf, size_t esize)
+//                : io_packet_base(ebuf, esize), modifypkt_arp() {
+//
+//        }
+//
+//        template<size_t esize>
+//        explicit arp_io_packet(char (&ebuf)[esize]) : arp_io_packet(ebuf, esize) {
+//
+//        }
+//
+//        void update_input(u_char *buf) override {
+//            modifypkt_base::update_input(buf);
+//
+//            arpHdr.htype = ARPHRD_ETHER;
+//            arpHdr.ptype = ETH_P_IP;
+//            arpHdr.hlen = 6;
+//            arpHdr.plen = 4;
+//
+//            ethHdr.type = ETH_P_ARP;
+//        }
+//
+//        /**
+//         * Send an ARP reply
+//         *
+//         * @param sender_ip sender's protocol(ip) address
+//         * @param sender_mac sender's hardware address
+//         * @param target_ip target's protocol(ip) address
+//         * @param target_mac target's hardware address
+//         * @return
+//         */
+//        inline bool reply(const std::string &sender_ip, const mac_t &sender_mac, const std::string &target_ip,
+//                          const mac_t &target_mac) {
+//            arpHdr.spa = sender_ip;
+//            arpHdr.sha = sender_mac;
+//            arpHdr.tpa = target_ip;
+//            arpHdr.tha = target_mac;
+//            arpHdr.oper = ARPOP_REPLY;
+//
+//            ethHdr.src = sender_mac;
+//            ethHdr.dst = target_mac;
+//
+//            return send_packet(content(), ETHER_HDRLEN + ARP_HDRLEN);
+//        }
+//
+//    };
 
 }

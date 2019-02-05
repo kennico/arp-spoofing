@@ -21,14 +21,16 @@ set(COMMON_SOURCE
         include/arpspf.h
         include/netinfo.h
         include/pkt.h
-        src/hdrs.h
-        include/fields.h
+        include/nethdrs.h
         src/misc.cpp src/gateway.cpp src/netinfo.cpp include/utils.h)
 
 
-add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
-target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
+#add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
+#target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
-add_executable(arpspf-test test/fields-test.cpp ${COMMON_SOURCE} test/usage-unique_ptr.cpp test/header-test.cpp test/tmpl_traits-test.cpp)
+add_executable(arpspf-test
+        ${COMMON_SOURCE}
+        src/hdrs.h
+        test/tmpl_traits-test.cpp test/test-nethds_fields.cpp test/test-nethdrs_headers.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 
