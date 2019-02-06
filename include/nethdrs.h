@@ -42,8 +42,8 @@ namespace kni {
          *
          * @return length in bits
          */
-        inline constexpr size_t len() const noexcept {
-            return bytes() << 3;
+        inline constexpr size_t bits_len() const noexcept {
+            return bytes() << 3;    // NOLINT
         }
 
         inline size_t off() const noexcept {
@@ -111,25 +111,25 @@ namespace kni {
     };
 
     template<size_t nbytes>
-    struct align_bits;
+    struct align_bytes;
 
     template<>
-    struct align_bits<1> {
+    struct align_bytes<1> {
         using aligned_type = uint8_t;
     };
 
     template<>
-    struct align_bits<2> {
+    struct align_bytes<2> {
         using aligned_type = uint16_t;
     };
 
     template<>
-    struct align_bits<3> {
+    struct align_bytes<3> {
         using aligned_type = uint32_t;
     };
 
     template<>
-    struct align_bits<4> {
+    struct align_bytes<4> {
         using aligned_type = uint32_t;
     };
 
@@ -139,7 +139,7 @@ namespace kni {
 
         constexpr static size_t MAX_BITS = sizeof(uint32_t) * 4;
 
-        using aligned_type  = typename align_bits<B>::aligned_type;
+        using aligned_type  = typename align_bytes<B>::aligned_type;
         using endian_type   = endianness<aligned_type>;
         using host_type     = aligned_type;
         using bytes_type    = aligned_type;
@@ -148,16 +148,8 @@ namespace kni {
         static_assert(N != 0, "zero length");
         static_assert(std::is_unsigned<aligned_type>::value, "unsigned required");
 
-        inline constexpr size_t bits() const noexcept {
+        inline constexpr size_t bits_len() const noexcept {
             return N;
-        }
-
-        /**
-         *
-         * @return length in bits
-         */
-        inline constexpr size_t len() const noexcept {
-            return bits();
         }
 
         /**
@@ -168,16 +160,16 @@ namespace kni {
             this->offset = offset;
 
             auto byt_off = offset % 8;
-            assert(byt_off + bits() <= MAX_BITS);
+            assert(byt_off + bits_len() <= MAX_BITS);
 
-            auto byt = 1 + (byt_off + bits() - 1) / 8; // How many bytes does it occupy since from_ptr?
+            auto byt = 1 + (byt_off + bits_len() - 1) / 8; // How many bytes does it occupy since from_ptr?
             assert(byt > 0 && byt < 4);
             assert(sizeof(aligned_type) == byt);
 
-            r_padding_count = byt * 8 - (byt_off + bits()); // How many bits should I left-shift the value?
+            r_padding_count = byt * 8 - (byt_off + bits_len()); // How many bits should I left-shift the value?
 
             auto mask = (aligned_type) 0xFFFFFFFF;
-            mask = (mask << (r_padding_count + bits())) | ~(mask << r_padding_count);   // NOLINT
+            mask = (mask << (r_padding_count + bits_len())) | ~(mask << r_padding_count);   // NOLINT
             net_invert_mask = endian_type::hton(mask);
         }
 
@@ -193,11 +185,6 @@ namespace kni {
         size_t offset{};
         size_t r_padding_count{};           // How many bits are there from its end to the first 8-bit byte
         aligned_type net_invert_mask{};     // Zeros for desired bits while ones for surrounding data bits in network order
-
-    };
-
-    template<size_t N, size_t B = alignment<N>::bytes>
-    class field_flags : public field_bits<N, B> {
 
     };
 
@@ -245,7 +232,6 @@ namespace kni {
             return endian_type::ntoh((*(aligned_type *) b & (~f.net_invert_mask)) >> f.r_padding_count);   // NOLINT
         }
     };
-
 
     template<>
     struct field_functor<field_ipv4> {
@@ -332,21 +318,27 @@ namespace kni {
     class base_header {
     protected:
         /**
+         * TODO A constructor accepting initial offset?
+         *
          * Called in derived constructor.
          */
-        class concatonate {
+        class concatenate {
         public:
 
+            explicit concatenate(size_t off = 0) : acc_len(off) {
+
+            }
+
             template<typename field_type>
-            inline concatonate &operator()(field_type &f) {
+            inline concatenate &operator()(field_type &f) {
                 f.off(acc_len);
-                acc_len += f.len();
+                acc_len += f.bits_len();
                 return *this;
             }
 
         public:
 
-            size_t acc_len{0}; // Measured in bits.
+            size_t acc_len; // Measured in bits.
 
         };
 
@@ -362,12 +354,8 @@ namespace kni {
 
         virtual size_t update_len(const void *hdr) {}
 
-        inline size_t update(const void *hdr) {
+        inline size_t update(const void *hdr) noexcept {
             hdrlen = update_len(hdr);
-        }
-
-        inline concatonate get_binder() {
-            return {};
         }
 
     private:
@@ -379,8 +367,7 @@ namespace kni {
     class eth_header : public base_header {
     public:
         eth_header() : base_header(ETHER_HDRLEN) {
-            concatonate cat;
-            cat(dst)(src)(type);
+            concatenate()(dst)(src)(type);
         }
 
     public:
@@ -392,8 +379,7 @@ namespace kni {
     class arp_header : public base_header {
     public:
         arp_header() : base_header(ARP_HDRLEN) {
-            concatonate cat;
-            cat(htype)(ptype)(hlen)(plen)
+            concatenate()(htype)(ptype)(hlen)(plen)
                     (oper)
                     (sha)(spa)(tha)(tpa);
         }
@@ -417,8 +403,7 @@ namespace kni {
         };
     public:
         ipv4_header() : base_header(IPV4_HDRLEN) {
-            concatonate cat;
-            cat(version)(ihl)(diff)(tot_len)
+            concatenate()(version)(ihl)(diff)(tot_len)
                     (id)(flags)(frag_off)
                     (ttl)(proto)(check)
                     (src)(dst);
@@ -456,7 +441,7 @@ namespace kni {
 
     public:
         tcp_header() : base_header(TCP_HDRLEN) {
-            concatonate()(src)(dst)
+            concatenate()(src)(dst)
                     (seq)(ack_seq)
                     (doff)(flags)(window)
                     (check)(urg_ptr);
