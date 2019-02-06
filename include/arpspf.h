@@ -65,15 +65,6 @@ namespace kni {
         pcap_t *handle{nullptr};
     };
 
-    struct arp_packet : public base_packet {
-        eth_header ethHdr{};
-        arp_header arpHdr{};
-
-        arp_packet() : base_packet() {
-            add_header(&ethHdr);
-            add_header(&arpHdr);
-        }
-    };
 
     class arp_io_packet :
             public io_packet_base,
@@ -95,7 +86,7 @@ namespace kni {
             setter set(buf);
             set(ethHdr.type, ETH_P_ARP);
 
-            set.incr(ethHdr);
+            set.incr(ETHER_HDRLEN);
             set(arpHdr.htype, ARPHRD_ETHER);
             set(arpHdr.ptype, ETH_P_IP);
             set(arpHdr.hlen, 6);
@@ -117,7 +108,7 @@ namespace kni {
             set(ethHdr.src, sender_mac);
             set(ethHdr.dst, target_mac);
 
-            set.incr(ethHdr);
+            set.incr(ETHER_HDRLEN);
             set(arpHdr.spa, sender_ip);
             set(arpHdr.sha, sender_mac);
             set(arpHdr.tpa, target_ip);

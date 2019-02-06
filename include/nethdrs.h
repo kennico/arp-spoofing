@@ -277,62 +277,28 @@ namespace kni {
         }
     };
 
+    /**
+     * TODO A constructor accepting initial offset?
+     *
+     * Called in derived constructor.
+     */
+    class concatenate {
+    public:
 
-    class base_header {
-    protected:
-        /**
-         * TODO A constructor accepting initial offset?
-         *
-         * Called in derived constructor.
-         */
-        class concatenate {
-        public:
+        constexpr explicit concatenate(size_t off = 0) : acc_len(off) {
 
-            constexpr explicit concatenate(size_t off = 0) : acc_len(off) {
+        }
 
-            }
-
-            template<typename field_type>
-            inline concatenate &operator()(field_type &f) {
-                f.off(acc_len);
-                acc_len += f.bits_len();
-                return *this;
-            }
-
-        public:
-
-            size_t acc_len; // Measured in bits.
-
-        };
+        template<typename field_type>
+        inline concatenate &operator()(field_type &f) {
+            f.off(acc_len);
+            acc_len += f.bits_len();
+            return *this;
+        }
 
     public:
 
-        constexpr explicit base_header(size_t init_len) : hdrlen(init_len) {
-
-        }
-
-        /**
-         *
-         * @return length in bytes
-         */
-        inline size_t len() const noexcept {
-            return hdrlen;
-        }
-
-        /**
-         *
-         * @param hdr
-         * @return length in bytes
-         */
-        virtual size_t update_len(const void *hdr) {}
-
-        inline size_t update(const void *hdr) noexcept {
-            hdrlen = update_len(hdr);
-        }
-
-    private:
-
-        size_t hdrlen;
+        size_t acc_len; // Measured in bits.
 
     };
 
@@ -352,8 +318,10 @@ namespace kni {
             return func((const char *) buf + (f.off() >> 3), f);  // NOLINT
         };
 
-        inline void incr(const base_header &hdr) noexcept {
-            (const char *) buf += hdr.len();
+        inline void incr(size_t len) noexcept {
+            auto tmp = ((const char *) buf);
+            tmp += len;
+            buf = tmp;
         }
 
     private:
@@ -374,17 +342,19 @@ namespace kni {
             return *this;
         };
 
-        inline void incr(const base_header &hdr) noexcept {
-            (char *) buf += hdr.len();
+        inline void incr(size_t len) noexcept {
+            auto tmp = ((char *) buf);
+            tmp += len;
+            buf = tmp;
         }
 
     private:
         void *buf;
     };
 
-    class eth_header : public base_header {
+    class eth_header {
     public:
-        eth_header() : base_header(ETHER_HDRLEN) {
+        eth_header() {
             concatenate()(dst)(src)(type);
         }
 
@@ -394,9 +364,9 @@ namespace kni {
         field_word type;
     };
 
-    class arp_header : public base_header {
+    class arp_header {
     public:
-        arp_header() : base_header(ARP_HDRLEN) {
+        arp_header() {
             concatenate()(htype)(ptype)(hlen)(plen)
                     (oper)
                     (sha)(spa)(tha)(tpa);
@@ -411,7 +381,7 @@ namespace kni {
 
     };
 
-    class ipv4_header : public base_header {
+    class ipv4_header {
     public:
         /**
          * IPv4 flags
@@ -420,16 +390,11 @@ namespace kni {
             MF = 0b001, DF = 0b010,
         };
     public:
-        ipv4_header() : base_header(IPV4_HDRLEN) {
+        ipv4_header() {
             concatenate()(version)(ihl)(diff)(tot_len)
                     (id)(flags)(frag_off)
                     (ttl)(proto)(check)
                     (src)(dst);
-        }
-
-        size_t update_len(const void *buf) override {
-            getter get(buf);
-            return static_cast<size_t>(get(ihl) * 4);
         }
 
     public:
@@ -446,7 +411,7 @@ namespace kni {
 
     };
 
-    class tcp_header : public base_header {
+    class tcp_header {
     public:
         /**
          * TCP flags
@@ -458,16 +423,11 @@ namespace kni {
         };
 
     public:
-        tcp_header() : base_header(TCP_HDRLEN) {
+        tcp_header() {
             concatenate()(src)(dst)
                     (seq)(ack_seq)
                     (doff)(flags)(window)
                     (check)(urg_ptr);
-        }
-
-        size_t update_len(const void *buf) override {
-            getter get(buf);
-            return static_cast<size_t>(get(doff) * 4);
         }
 
     public:
@@ -480,25 +440,9 @@ namespace kni {
 
     };
 
-    class base_packet {
-
-    public:
-
-        virtual void update(const void *buf) {
-            auto from = (const char *) buf;
-            for (auto hdr_ptr : headers) {
-                hdr_ptr->update(from);
-                from += hdr_ptr->len();
-            }
-        }
-
-    protected:
-        void add_header(base_header *hdr_ptr) {
-            headers.push_back(hdr_ptr);
-        }
-
-    private:
-        std::list<base_header *> headers;
+    struct arp_packet {
+        eth_header ethHdr{};
+        arp_header arpHdr{};
     };
 
 }

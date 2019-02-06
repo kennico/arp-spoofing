@@ -17,12 +17,12 @@ include(find_libpcap.cmake)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-set(COMMON_SOURCE
-        include/arpspf.h
+set(NETHEADERS
         include/netinfo.h
         include/pkt.h
         include/nethdrs.h
         include/utils.h
+        src/hdrs.h
         src/misc.cpp src/gateway.cpp src/netinfo.cpp)
 
 
@@ -30,8 +30,8 @@ set(COMMON_SOURCE
 #target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
 add_executable(arpspf-test
-        ${COMMON_SOURCE}
+        ${NETHEADERS}
         src/hdrs.h
-        test/tmpl_traits-test.cpp test/test-nethds_fields.cpp test/test-nethdrs_headers.cpp)
+        test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 
