@@ -28,6 +28,11 @@ namespace kni {
      *
      */
 
+    /**
+     * Field measured in bytes.
+     *
+     * @tparam N
+     */
     template<typename N>
     class field_bytes_base {
     public:
@@ -133,6 +138,12 @@ namespace kni {
         using aligned_type = uint32_t;
     };
 
+    /**
+     * Field measured in bits.
+     *
+     * @tparam N
+     * @tparam B
+     */
     template<size_t N, size_t B = alignment<N>::bytes>
     class field_bits {
     public:
@@ -193,12 +204,12 @@ namespace kni {
      *
      * uintX_t is guaranteed to an integer type with width X
      */
-    using field_byte = field_unsigned<uint8_t>;
-    using field_word = field_unsigned<uint16_t>;
-    using field_dword= field_unsigned<uint32_t>;
+    using field_byte = field_unsigned<uint8_t>;     // unsigned 8-bit integer
+    using field_word = field_unsigned<uint16_t>;    // unsigned 16-bit integer
+    using field_dword= field_unsigned<uint32_t>;    // unsigned 32-bit integer
 
-    using field_ipv4 = field_bytes_base<ipv4_t>;
-    using field_mac  = field_bytes_base<mac_t>;
+    using field_ipv4 = field_bytes_base<ipv4_t>;    // IPv4 address
+    using field_mac  = field_bytes_base<mac_t>;     // MAC address
 
     template<typename F>
     struct field_functor;
@@ -278,8 +289,6 @@ namespace kni {
     };
 
     /**
-     * TODO A constructor accepting initial offset?
-     *
      * Called in derived constructor.
      */
     class concatenate {
@@ -308,6 +317,15 @@ namespace kni {
 
         }
 
+        /**
+         *
+         * @tparam field_type
+         * @tparam host_type
+         * @tparam func_type
+         * @param f a field definition
+         * @param func a callable object with prototype host_type f(const char*, field)
+         * @return a value of host_type
+         */
         template<typename field_type,
                 typename host_type = typename field_type::host_type,
                 typename func_type = field_functor<field_type>>
@@ -318,6 +336,11 @@ namespace kni {
             return func((const char *) buf + (f.off() >> 3), f);  // NOLINT
         };
 
+        /**
+         * Advance the buffer pointer in bytes.
+         *
+         * @param len
+         */
         inline void incr(size_t len) noexcept {
             auto tmp = ((const char *) buf);
             tmp += len;
@@ -334,6 +357,16 @@ namespace kni {
 
         }
 
+        /**
+         *
+         * @tparam field_type
+         * @tparam host_type
+         * @tparam func_type
+         * @param f a field definition
+         * @param h value to be used
+         * @param func a callable object with prototype void f(char*, field, value)
+         * @return
+         */
         template<typename field_type,
                 typename host_type = typename field_type::host_type,
                 typename func_type = field_functor<field_type>>
@@ -342,6 +375,11 @@ namespace kni {
             return *this;
         };
 
+        /**
+         * Advance the buffer pointer in bytes.
+         *
+         * @param len
+         */
         inline void incr(size_t len) noexcept {
             auto tmp = ((char *) buf);
             tmp += len;
@@ -352,6 +390,9 @@ namespace kni {
         void *buf;
     };
 
+    /*
+     * Header definitions
+     */
     class eth_header {
     public:
         eth_header() {
@@ -440,6 +481,9 @@ namespace kni {
 
     };
 
+    /*
+     * Packet definitions
+     */
     struct arp_packet {
         eth_header ethHdr{};
         arp_header arpHdr{};
