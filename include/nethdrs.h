@@ -277,6 +277,65 @@ namespace kni {
         }
     };
 
+
+    class base_header {
+    protected:
+        /**
+         * TODO A constructor accepting initial offset?
+         *
+         * Called in derived constructor.
+         */
+        class concatenate {
+        public:
+
+            constexpr explicit concatenate(size_t off = 0) : acc_len(off) {
+
+            }
+
+            template<typename field_type>
+            inline concatenate &operator()(field_type &f) {
+                f.off(acc_len);
+                acc_len += f.bits_len();
+                return *this;
+            }
+
+        public:
+
+            size_t acc_len; // Measured in bits.
+
+        };
+
+    public:
+
+        constexpr explicit base_header(size_t init_len) : hdrlen(init_len) {
+
+        }
+
+        /**
+         *
+         * @return length in bytes
+         */
+        inline size_t len() const noexcept {
+            return hdrlen;
+        }
+
+        /**
+         *
+         * @param hdr
+         * @return length in bytes
+         */
+        virtual size_t update_len(const void *hdr) {}
+
+        inline size_t update(const void *hdr) noexcept {
+            hdrlen = update_len(hdr);
+        }
+
+    private:
+
+        size_t hdrlen;
+
+    };
+
     class getter {
     public:
         explicit getter(const void *b) : buf(b) {
@@ -292,6 +351,10 @@ namespace kni {
              */
             return func((const char *) buf + (f.off() >> 3), f);  // NOLINT
         };
+
+        inline void incr(const base_header &hdr) noexcept {
+            (const char *) buf += hdr.len();
+        }
 
     private:
         const void *buf;
@@ -311,57 +374,12 @@ namespace kni {
             return *this;
         };
 
+        inline void incr(const base_header &hdr) noexcept {
+            (char *) buf += hdr.len();
+        }
+
     private:
         void *buf;
-    };
-
-    class base_header {
-    protected:
-        /**
-         * TODO A constructor accepting initial offset?
-         *
-         * Called in derived constructor.
-         */
-        class concatenate {
-        public:
-
-            explicit concatenate(size_t off = 0) : acc_len(off) {
-
-            }
-
-            template<typename field_type>
-            inline concatenate &operator()(field_type &f) {
-                f.off(acc_len);
-                acc_len += f.bits_len();
-                return *this;
-            }
-
-        public:
-
-            size_t acc_len; // Measured in bits.
-
-        };
-
-    public:
-
-        explicit base_header(size_t init_len) : hdrlen(init_len) {
-
-        }
-
-        inline size_t len() const noexcept {
-            return hdrlen;
-        }
-
-        virtual size_t update_len(const void *hdr) {}
-
-        inline size_t update(const void *hdr) noexcept {
-            hdrlen = update_len(hdr);
-        }
-
-    private:
-
-        size_t hdrlen;
-
     };
 
     class eth_header : public base_header {

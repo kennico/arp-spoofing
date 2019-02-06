@@ -22,7 +22,8 @@ set(COMMON_SOURCE
         include/netinfo.h
         include/pkt.h
         include/nethdrs.h
-        src/misc.cpp src/gateway.cpp src/netinfo.cpp include/utils.h)
+        include/utils.h
+        src/misc.cpp src/gateway.cpp src/netinfo.cpp)
 
 
 #add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
