@@ -26,8 +26,11 @@ set(NETHEADERS
         src/misc.cpp src/gateway.cpp src/netinfo.cpp)
 
 
-#add_executable(arpspf src/main.cpp ${COMMON_SOURCE})
-#target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
+add_executable(arpspf
+        ${NETHEADERS}
+        include/arpspf.h
+        src/main.cpp src/pth-args.h src/pth-spoof.cpp src/pth-hjiack-http.cpp)
+target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
 add_executable(arpspf-test
         ${NETHEADERS}

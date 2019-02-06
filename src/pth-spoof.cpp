@@ -10,11 +10,11 @@ void *routine_start_spoof(void *ptr) {
     auto args = (pthargs_spoof *) ptr;
     auto netdb = args->netdb;
 
-    char errbuf[PCAP_ERRBUF_SIZE] = {0};
-    arp_io_packet arp_io(errbuf);
+    std::unique_ptr<char[]> errbuf(new char[PCAP_ERRBUF_SIZE]);
+    std::unique_ptr<u_char[]> sndbuf(new u_char[ETHER_HDRLEN + ARP_HDRLEN]);
 
-    u_char sndbuf[ETHER_HDRLEN + ARP_HDRLEN] = {0};
-    arp_io.update_input(sndbuf);
+    arp_io_packet arp_io(errbuf.get(), PCAP_ERRBUF_SIZE);
+    arp_io.prepare(sndbuf.get());
 
     if (!arp_io.open(netdb->devname)) {
         KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.error());

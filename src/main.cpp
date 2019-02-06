@@ -11,20 +11,15 @@
 using namespace kni;
 
 void *routine_start_spoof(void *ptr);
-
 void *routine_start_hijack_http(void *ptr);
 
 typedef void (*arpspf_func)(int, char *[]);
 
 void arpspf_exit(int, char **);
 void arpspf_scan_lan(int, char **);
-
 void arpspf_start_spoof(int, char **);
-
 void arpspf_stop_spoof(int, char **);
-
 void arpspf_start_hijack_http(int, char **);
-
 void arpspf_stop_hijack_http(int, char **);
 void arpspf_device(int, char **);
 
@@ -83,9 +78,6 @@ int main(int argc, char *argv[]) {
 
             wordexp_t we{};
             int we_ret = wordexp(line_buf, &we, 0);
-            for (int i = 0; i < we.we_wordc; ++i)
-                KNI_LOG_DEBUG("passing argv[%d]=%s", i, we.we_wordv[i]);
-
             if (we_ret == 0) {
                 std::string name(we.we_wordv[0]);
                 if (arpspf_cmd.count(name)) {
@@ -209,14 +201,14 @@ void arpspf_start_spoof(int argc, char **argv) {
             return;
 
         } else if (mac_pton(argv[1], &victim_mac) == 0) {
-            KNI_PRINTLN("\"%s\" is not a valid MAC address\n", argv[1]);
+            KNI_PRINTLN("\"%s\" is not a valid MAC address", argv[1]);
             return;
 
         }
-        KNI_PRINTLN("Using user-supplied MAC \"%s\"\n", argv[1]);
+        KNI_PRINTLN("Using user-supplied MAC \"%s\"", argv[1]);
 
     } else if (victim_ip == netdb->gateway_ip) {
-        KNI_PRINTLN("An ip address except the gateway's is required.\n");
+        KNI_PRINTLN("An ip address except the gateway's is required.");
         return;
 
     } else {
@@ -229,12 +221,17 @@ void arpspf_start_spoof(int argc, char **argv) {
     args->victim_mac = victim_mac;
     args->npackets = npackets;
     args->seconds = seconds;
+    args->netdb = netdb.get();
     args->to_be_running = true;
 
-    int ret = pthread_create(&args->thread_id,
-                             nullptr,
-                             routine_start_spoof, args);
+    KNI_LOG_DEBUG("IP=%s, twoway=%d, MAC=%s, npkt=%d, sec=%d",
+                  victim_ip.c_str(),
+                  twoway,
+                  to_string(victim_mac).c_str(),
+                  npackets,
+                  seconds);
 
+    int ret = pthread_create(&args->thread_id, nullptr, routine_start_spoof, args);
     if (ret != 0) {
         KNI_LOG_ERROR("pthread_create() returns %d:%s", ret, strerror(ret));
         return;
@@ -340,7 +337,6 @@ void arpspf_device(int, char **) {
     KNI_LOG_DEBUG("%s()", __FUNCTION__);
 
     KNI_PRINTLN("Gateway: %s", netdb->gateway_ip.c_str());
-
     KNI_PRINTLN("Device \"%s\":", netdb->devname.c_str());
 
     auto netenv = &(netdb->devinfo);

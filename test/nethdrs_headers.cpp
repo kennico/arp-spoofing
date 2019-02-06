@@ -128,7 +128,7 @@ TEST(NetHeaders, TcpHeaderReadWrite) {
     EXPECT_EQ(0x53e45aee, get(tcpHdr.seq));
     EXPECT_EQ(0x0, get(tcpHdr.ack_seq));
     EXPECT_EQ(10, get(tcpHdr.doff));
-    EXPECT_EQ(kni::tcp_header::SYN, get(tcpHdr.flags));
+    EXPECT_EQ(kni::tcp_header::syn, get(tcpHdr.flags));
     EXPECT_EQ(29200, get(tcpHdr.window));
     EXPECT_EQ(0x94c3, get(tcpHdr.check));
     EXPECT_EQ(0, get(tcpHdr.urg_ptr));
@@ -140,7 +140,7 @@ TEST(NetHeaders, TcpHeaderReadWrite) {
     set(tcpHdr.seq, 0x53e45aee);
     set(tcpHdr.ack_seq, 0x00000000);
     set(tcpHdr.doff, 10);
-    set(tcpHdr.flags, kni::tcp_header::SYN);
+    set(tcpHdr.flags, kni::tcp_header::syn);
     set(tcpHdr.window, 29200);
     set(tcpHdr.check, 0x94c3);
     set(tcpHdr.urg_ptr, 0);

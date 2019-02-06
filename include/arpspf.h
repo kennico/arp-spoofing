@@ -17,7 +17,7 @@
 
 namespace kni {
 
-#if 0
+
     class io_packet_base : public buffered_error {
 
     public:
@@ -84,7 +84,7 @@ namespace kni {
         }
 
         void prepare(u_char *buf) {
-            arp_packet::update(buf);
+            this->buf = buf;
 
             setter set(buf);
             set(ethHdr.type, ETH_P_ARP);
@@ -126,5 +126,4 @@ namespace kni {
         u_char *buf{nullptr};
 
     };
-#endif
 }

@@ -428,7 +428,7 @@ namespace kni {
          * IPv4 flags
          */
         enum {
-            MF = 0b001, DF = 0b010,
+            mf = 0b001, df = 0b010,
         };
     public:
         ipv4_header() {
@@ -458,9 +458,9 @@ namespace kni {
          * TCP flags
          */
         enum {
-            FIN = 0x001, SYN = 0x002, RST = 0x004, PSH = 0x008,
-            ACK = 0x010, URG = 0x020, ECE = 0x040, CWR = 0x080,
-            NCE = 0x100
+            fin = 0x001, syn = 0x002, rst = 0x004, psh = 0x008,
+            ack = 0x010, urg = 0x020, ece = 0x040, cwr = 0x080,
+            nce = 0x100
         };
 
     public:

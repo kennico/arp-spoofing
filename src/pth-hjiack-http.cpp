@@ -43,5 +43,5 @@ void *routine_start_hijack_http(void *ptr) {
 ////            if (hdrs.ipHdr.dst)
 //        }
 //    }
-    return nullptr
+    return nullptr;
 }
