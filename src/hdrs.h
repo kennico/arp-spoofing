@@ -4,13 +4,21 @@
 
 #pragma once
 
+#include <string>
+#include <map>
+#include <queue>
+#include <set>
+#include <initializer_list>
+#include <algorithm>
+
 #include <cstring>
 #include <cctype>
 #include <cstdio>
 #include <cassert>
 #include <cerrno>
 
-#include <initializer_list>
+#include <pthread.h>
+
 
 #include <unistd.h>
 #include <netinet/in.h>
@@ -46,11 +54,11 @@
 #define KNI_LOG_WARN(...)
 #endif
 
-#define KNI_OUTPUT_LF(...) do {\
+#define KNI_PRINTLN(...) do {\
     fprintf(stdout, __VA_ARGS__);fprintf(stdout, "\n");\
 }while(false)
 
-#define KNI_OUTPUT(...) do {\
+#define KNI_PRINT(...) do {\
     fprintf(stdout, __VA_ARGS__);\
 }while(false)
 
