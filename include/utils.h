@@ -5,8 +5,12 @@
 #pragma once
 
 #include <sys/types.h>
+#include <netinet/in.h>
 
 #include <memory>
+#include <map>
+#include <set>
+
 #include <cstring>
 #include <cassert>
 
@@ -82,5 +86,122 @@ namespace kni {
         char *buf{nullptr};
         size_t bufsize{0};
     };
+
+    /**
+     * Non-injective mapping distinguished with the std::multimap
+     *
+     * @tparam K
+     * @tparam V
+     */
+    template<typename K, typename V>
+    class reverse_map {
+    public:
+        /**
+         * Insert a key-value pair
+         *
+         * @param key
+         * @param value
+         * @return
+         */
+        inline bool map(const K &key, const V &value) {
+            if (!direct.insert(std::make_pair(key, value)).second)
+                return false;
+
+            if (reverse.count(value) == 0) {
+                std::set<K> tmp;
+                tmp.insert(key);
+                reverse[value] = std::move(tmp);
+            } else {
+                reverse[value].insert(key);
+            }
+
+        }
+
+        inline bool empty() const noexcept {
+            assert(direct.empty() == reverse.empty());
+            return direct.empty();
+        }
+
+        inline bool has_key(const K &key) const noexcept {
+            return direct.count(key) == 1;
+        }
+
+        /**
+         *
+         * @param value
+         * @return the count of keys with the same given value
+         */
+        inline size_t count(const V &value) const noexcept {
+            if (has_value(value)) {
+                return rmap(value).size();
+            } else {
+                return 0;
+            }
+        }
+
+        inline bool has_value(const V &value) const noexcept {
+            return reverse.count(value) == 1;
+        }
+
+        inline const std::map<K, V> &m() const noexcept {
+            return direct;
+        };
+
+        inline const V &map(const K &key) const noexcept {
+            return direct.at(key);
+        }
+
+        inline const std::set<K> &rmap(const V &value) const noexcept {
+            return reverse.at(value);
+        }
+
+        inline const std::map<V, std::set<K>> &r() const noexcept {
+            return reverse;
+        };
+
+        /**
+         *
+         * @param key not guaranteed to be present in this mapping
+         */
+        inline void erase_key(const K &key) noexcept {
+            auto value = direct[key];
+
+            reverse[value].erase(key);
+            if (reverse[value].empty())
+                reverse.erase(value);
+
+            direct.erase(key);
+        }
+
+        inline void erase_value(const V &value) noexcept {
+            for (auto key : reverse.at(value))
+                direct.erase(key);
+            reverse.erase(value);
+        }
+
+        /**
+         *
+         * @param old not guaranteed to be present in this mapping
+         * @param now
+         * @return
+         */
+        inline void update(const V &old, const V &now) {
+            for (auto key: reverse.at(old))
+                direct[key] = now;
+
+            if (reverse.count(now) == 1)
+                reverse[now].insert(reverse[old].begin(),
+                                    reverse[old].end()); // If the new value already exists, then merge two sets
+            else
+                reverse[now] = std::move(reverse[old]); // Insert as a brand new element
+
+            reverse.erase(old);
+        }
+
+    private:
+        std::map<K, V> direct;
+        std::map<V, std::set<K>> reverse;
+    };
+
 
 }
