@@ -1,7 +1,7 @@
 //
 // Created by kenny on 2/5/19.
 //
-
+#ifdef KNI_DEBUG
 #include <gtest/gtest.h>
 
 
@@ -148,3 +148,5 @@ TEST(NetHeaders, TcpHeaderReadWrite) {
     for (int i = 0; i < sizeof(expected_header); ++i)
         EXPECT_EQ(expected_header[i], buf[i]) << "at byte " << i;
 }
+
+#endif // KNI_DEBUG

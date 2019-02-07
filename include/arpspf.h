@@ -99,6 +99,8 @@ namespace kni {
         /**
          * Send an ARP reply
          *
+         * TODO bcast() for ARP broadcast
+         *
          * @param sender_ip sender's protocol(ip) address
          * @param sender_mac sender's hardware address
          * @param target_ip target's protocol(ip) address

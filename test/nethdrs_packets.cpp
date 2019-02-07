@@ -1,7 +1,7 @@
 //
 // Created by kenny on 2/6/19.
 //
-
+#ifdef KNI_DEBUG
 #include <gtest/gtest.h>
 
 #include "nethdrs.h"
@@ -56,3 +56,5 @@ TEST(NetHeaders, ArpPacketReadWrite) {
     for (int i = 0; i < sizeof(expected_packet); ++i)
         EXPECT_EQ(expected_packet[i], buf[i]) << "at byte " << i;
 }
+
+#endif // KNI_DEBUG

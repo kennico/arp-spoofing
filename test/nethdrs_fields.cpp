@@ -1,11 +1,10 @@
 //
 // Created by kenny on 2/5/19.
 //
+#ifdef KNI_DEBUG
 
 #include <gtest/gtest.h>
-
 #include "nethdrs.h"
-
 
 TEST(NetHeaders, SetGetFieldByte) {
     u_char buf[4] = {0x12, 0x34, 0x56, 0x78};
@@ -106,3 +105,5 @@ TEST(NetHeaders, SetGetFieldBits3) {
     kni::getter get(buf);
     EXPECT_EQ(0x05, get(bits));
 }
+
+#endif // KNI_DEBUG

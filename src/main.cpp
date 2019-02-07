@@ -312,9 +312,14 @@ void arpspf_start_hijack_http(int argc, char **argv) {
 
     auto args = args_hij.get();
 
-    args->victim_ip = argv[0];
+
+    if (inet_pton(AF_INET, argv[0], &args->victim_ip) == 0) {
+        KNI_LOG_ERROR("\"%s\" does not contain a valid IPv4 address", argv[0]);
+        return;
+    }
+
     args->netdb = netdb.get();
-    args->dest_port = static_cast<uint16_t>(port);
+    args->httpd = static_cast<uint16_t>(port);
     args->to_be_running = true;
 
     auto ret = pthread_create(&args->thread_id,

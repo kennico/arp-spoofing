@@ -311,6 +311,9 @@ namespace kni {
 
     };
 
+    /**
+     * TODO Auto offset increment among headers?
+     */
     class getter {
     public:
         explicit getter(const void *b) : buf(b) {
@@ -337,14 +340,16 @@ namespace kni {
         };
 
         /**
-         * Advance the buffer pointer in bytes.
+         * Advance the buffer pointer in bytes. Called when accessing a different header.
          *
          * @param len
          */
-        inline void incr(size_t len) noexcept {
+        inline getter &incr(size_t len) noexcept {
             auto tmp = ((const char *) buf);
             tmp += len;
             buf = tmp;
+
+            return *this;
         }
 
     private:
@@ -376,20 +381,24 @@ namespace kni {
         };
 
         /**
-         * Advance the buffer pointer in bytes.
+         * Advance the buffer pointer in bytes. Called when accessing a different header.
          *
          * @param len
          */
-        inline void incr(size_t len) noexcept {
+        inline setter &incr(size_t len) noexcept {
             auto tmp = ((char *) buf);
             tmp += len;
             buf = tmp;
+
+            return *this;
         }
 
     private:
         void *buf;
     };
 
+    using fields_getter = getter;
+    using fields_setter = setter;
     /*
      * Header definitions
      */
