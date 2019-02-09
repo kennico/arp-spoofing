@@ -7,7 +7,7 @@
 
 #include "../src/hdrs.h"
 #include "../src/fake-port.h"
-#include "utils_misc.h"
+#include "utils.h"
 
 
 TEST(ReverseMap, AddMapping) {
@@ -115,19 +115,36 @@ TEST(FakePortManager, UsingOutdatedPort) {
     res.push_back(mgr.alloc()); // 1
     res.push_back(mgr.alloc()); // 2
     res.push_back(mgr.alloc()); // 3
-    sleep(3);
+    sleep(2);
     res.push_back(mgr.alloc()); // 4
     res.push_back(mgr.alloc()); // 1
     res.push_back(mgr.alloc()); // 2
     mgr.free(4);
     res.push_back(mgr.alloc()); // 3
     res.push_back(mgr.alloc()); // 4
-    sleep(3);
+    sleep(2);
     res.push_back(mgr.alloc()); // 1
     res.push_back(mgr.alloc()); // 2
 
     EXPECT_EQ(exp, res);
 }
 
+TEST(FakePortManager, UsingOutdatedPort2) {
+    std::vector<kni::port_t> exp = {10036, 10037, 10038, 10039, 10036, 10037};
+    std::vector<kni::port_t> res;
+
+    kni::fake_port_manager mgr(10036, 10040, 2);
+
+    res.push_back(mgr.alloc());
+    res.push_back(mgr.alloc());
+    res.push_back(mgr.alloc());
+    res.push_back(mgr.alloc());
+
+    sleep(2);
+    res.push_back(mgr.alloc());
+    res.push_back(mgr.alloc());
+
+    EXPECT_EQ(exp, res);
+}
 
 #endif // KNI_DEBUG

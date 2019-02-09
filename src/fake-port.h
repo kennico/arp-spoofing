@@ -10,9 +10,6 @@
 
 namespace kni {
 
-    /**
-     * The timestamp doesn't work well with a small timeout value
-     */
     class fake_port_manager {
     public:
         constexpr static port_t nport = 0;
@@ -65,7 +62,7 @@ namespace kni {
                 auto old_tm = ite->first;
                 auto &ports = ite->second;
 
-                if (now - old_tm > timeout) {
+                if (now - old_tm >= timeout) {
                     // If the selected ports are outdated
                     // Add the outdated ports to recycle bin
 

@@ -31,13 +31,13 @@ namespace kni {
     /**
      * Field measured in bytes.
      *
-     * @tparam N
+     * @tparam T
      */
-    template<typename N>
+    template<typename T>
     class field_bytes_base {
     public:
-        using bytes_type    = N;
-        using host_type     = N;
+        using bytes_type    = T;
+        using host_type     = T;
 
         inline constexpr size_t bytes() const noexcept {
             return sizeof(bytes_type);
@@ -64,7 +64,7 @@ namespace kni {
         size_t offset{0};
     };
 
-    template<typename network_type>
+    template<typename T>
     struct endianness;
 
     template<>
@@ -106,8 +106,8 @@ namespace kni {
         }
     };
 
-    template<typename N>
-    class field_unsigned : public field_bytes_base<N> {
+    template<typename T>
+    class field_unsigned : public field_bytes_base<T> {
     };
 
     template<size_t nbits>
@@ -289,7 +289,7 @@ namespace kni {
     };
 
     /**
-     * Called in derived constructor.
+     * Called in header class's constructor.
      */
     class concatenate {
     public:
