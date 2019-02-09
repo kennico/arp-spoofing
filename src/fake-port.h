@@ -21,36 +21,33 @@ namespace kni {
          */
         explicit fake_port_manager(uint32_t f = 1024, uint32_t s = 0x10000, time_t t = 5) :
                 from(f), stop(s), timeout(t) {
-            assert(f < s && s < 0x10000);
+            assert(f < s && f > 0 && s < 0x10000);
         }
 
         /**
          * When SYN or RST is set
          *
-         * @param port
-         * @return true if port is actually released
+         * @param p
          */
-        inline bool free(port_t port) noexcept {
-            if (timestamps.has_key(port)) {
-                timestamps.erase_key(port);
-                recycle.push(port);
-                return true;
+        inline void free(port_t p) noexcept {
+            if (timestamps.has_key(p)) {
+                timestamps.erase_key(p);
+                free_que.push(p);
             }
-            return false;
         }
 
         /**
          * Allocate a port
          *
-         * @return nport on failure
+         * @return nport on failure indicating the exhaustion of fake ports
          */
         inline port_t alloc() noexcept {
             port_t ret = nport;
             auto now = time(nullptr);
 
-            if (!recycle.empty()) {
-                ret = recycle.front();
-                recycle.pop();
+            if (!free_que.empty()) {
+                ret = free_que.front();
+                free_que.pop();
 
             } else if (from != stop) {
                 ret = static_cast<port_t>(from++);
@@ -64,11 +61,11 @@ namespace kni {
 
                 if (now - old_tm >= timeout) {
                     // If the selected ports are outdated
-                    // Add the outdated ports to recycle bin
+                    // Add the outdated ports to free_que
 
                     // The smallest one comes first
                     for (auto beg = ++ports.begin(); beg != ports.end(); ++beg)
-                        recycle.push(*beg);
+                        free_que.push(*beg);
 
                     ret = *(std::min_element(ports.begin(), ports.end()));
                     // Remove the outdated ports
@@ -83,24 +80,37 @@ namespace kni {
         }
 
         /**
+         * TODO Necessary to return a value?
+         *
          * Refresh the timestamp of the given port
+         *
          * @param p
+         * @return false if the port is not in used.
          */
-        inline void refresh(port_t p) noexcept {
-            assert(timestamps.has_key(p));
+        inline bool refresh(port_t p) noexcept {
+            if (timestamps.has_key(p)) {
+                auto old = timestamps.map(p);
+                auto now = time(nullptr);
 
-            timestamps.erase_key(p);
-            auto map_succ = timestamps.map(p, time(nullptr));
-            assert(map_succ);
+                if (now - old < timeout) {
+                    timestamps.map(p, now);
+                    return true;
+                }
+
+                timestamps.erase_key(p);
+                free_que.push(p);
+            }
+
+            return false;
         }
 
-#ifndef KNI_DEBUG
-        private:
-#endif
+
+    private:
+
         uint32_t from, stop;
         time_t timeout;
 
-        std::queue<port_t> recycle;
+        std::queue<port_t> free_que;
         kni::reverse_map<port_t, time_t> timestamps;
     };
 }

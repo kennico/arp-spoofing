@@ -88,6 +88,8 @@ namespace kni {
     };
 
     /**
+     * TODO Impl iterator?
+     *
      * Non-injective mapping distinguished with the std::multimap
      *
      * @tparam K
@@ -101,11 +103,10 @@ namespace kni {
          *
          * @param key
          * @param value
-         * @return
          */
-        inline bool map(const K &key, const V &value) {
-            if (!direct.insert(std::make_pair(key, value)).second)
-                return false;
+        inline void map(const K &key, const V &value) {
+            if (has_key(key))
+                erase_key(key);
 
             if (reverse.count(value) == 0) {
                 std::set<K> tmp;
@@ -115,6 +116,8 @@ namespace kni {
                 reverse[value].insert(key);
             }
 
+            auto insert_succ = direct.insert(std::make_pair(key, value)).second;
+            assert(insert_succ);
         }
 
         inline bool empty() const noexcept {
@@ -151,6 +154,12 @@ namespace kni {
             return direct.at(key);
         }
 
+        /**
+         * Throw std::out_of_range if such value does not exist
+         *
+         * @param value
+         * @return a set of keys having the same value
+         */
         inline const std::set<K> &rmap(const V &value) const noexcept {
             return reverse.at(value);
         }
