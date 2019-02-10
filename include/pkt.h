@@ -17,6 +17,7 @@
 #define TCP_HDRLEN      40 // no options
 #define TCP_MAX_HDRLEN  60
 #define IPV6_HDRLEN     40
+#define PSEUDO_IPV4_HDRLEN (4*2+1*2+2)
 
 namespace kni {
 

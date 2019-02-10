@@ -149,4 +149,73 @@ TEST(NetHeaders, TcpHeaderReadWrite) {
         EXPECT_EQ(expected_header[i], buf[i]) << "at byte " << i;
 }
 
+TEST(NetHeaders, Ipv4HeaderCompute1) {
+    /*
+     * https://www.thegeekstuff.com/2012/05/ip-header-checksum
+     */
+    const u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x1c, 0x46, 0x40, 0x00, 0x40, 0x06,
+            0x00, 0x00, 0xac, 0x10, 0x0a, 0x63, 0xac, 0x10,
+            0x0a, 0x0c,
+    };
+
+    kni::ipv4_header ipHdr;
+    EXPECT_EQ(0xb1e6, ipHdr.cal_checksum(pkt));
+}
+
+TEST(NetHeaders, Ipv4HeaderCompute2) {
+    /*
+     * https://en.m.wikipedia.org/wiki/IPv4_header_checksum
+     */
+    const u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x73, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11,
+            0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8,
+            0x00, 0xc7,
+    };
+
+    kni::ipv4_header ipHdr;
+    EXPECT_EQ(0xb861, ipHdr.cal_checksum(pkt));
+}
+
+TEST(NetHeaders, Ipv4HeaderCompute3) {
+    const u_char pkt[] = {
+            0x45, 0x00,
+            0x00, 0x3c, 0x14, 0xdb, 0x40, 0x00, 0x40, 0x06,
+            0x00, 0x00, 0xc0, 0xa8, 0xe1, 0xb1, 0xcb, 0xd0,
+            0x28, 0x57,
+    };
+
+    kni::ipv4_header ipHdr;
+
+    EXPECT_EQ(0x8f5f, ipHdr.cal_checksum(pkt));
+}
+
+TEST(NetHeaders, TcpHeaderCompute) {
+
+    const u_char pkt[] = {
+            0x9c, 0xfe, 0x01, 0xbb, 0x53, 0xe4, 0x5a, 0xee,
+            0x00, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x72, 0x10,
+            0x94, 0xc3, 0x00, 0x00, 0x02, 0x04, 0x05, 0xb4,
+            0x04, 0x02, 0x08, 0x0a, 0x00, 0x36, 0x5c, 0xe8,
+            0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x07
+    };
+
+    kni::tcp_header tcpHdr;
+    kni::pseudo_ipv4 pseudoIpHdr;
+
+    u_char buf[PSEUDO_IPV4_HDRLEN];
+    kni::fields_setter set(buf);
+
+    set(pseudoIpHdr.src, "192.168.225.177");
+    set(pseudoIpHdr.dst, "203.208.40.87");
+    set(pseudoIpHdr.proto, IPPROTO_TCP);
+    set(pseudoIpHdr.rsv, 0);
+    set(pseudoIpHdr.tcp_len, 40);
+
+
+    EXPECT_EQ(0, tcpHdr.cal_checksum(pkt, buf));
+}
+
 #endif // KNI_DEBUG

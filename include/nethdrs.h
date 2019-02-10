@@ -352,6 +352,15 @@ namespace kni {
             return *this;
         }
 
+        inline getter &change(const void *buf) noexcept {
+            this->buf = buf;
+            return *this;
+        }
+
+        inline const void *from() const noexcept {
+            return buf;
+        }
+
     private:
         const void *buf;
     };
@@ -391,6 +400,15 @@ namespace kni {
             buf = tmp;
 
             return *this;
+        }
+
+        inline setter &change(void *buf) noexcept {
+            this->buf = buf;
+            return *this;
+        }
+
+        inline void *from() const noexcept {
+            return buf;
         }
 
     private:
@@ -447,6 +465,12 @@ namespace kni {
                     (src)(dst);
         }
 
+        inline uint16_t cal_checksum(const void *from) const noexcept {
+            fields_getter get(from);
+
+            return compute_check(from, static_cast<size_t>(get(ihl) * 4));
+        }
+
     public:
 
         field_bits<4> version;      // Version
@@ -461,8 +485,23 @@ namespace kni {
 
     };
 
-    class tcp_header {
+    class pseudo_ipv4 {
     public:
+        pseudo_ipv4() {
+            concatenate()(src)(dst)(rsv)(proto)(tcp_len);
+        }
+
+    public:
+        field_ipv4 src, dst;
+        field_byte rsv, proto;
+        field_word tcp_len;     // Not present in TCP header
+    };
+
+    class tcp_header {
+
+    public:
+
+
         /**
          * TCP flags
          */
@@ -478,6 +517,14 @@ namespace kni {
                     (seq)(ack_seq)
                     (doff)(flags)(window)
                     (check)(urg_ptr);
+        }
+
+        inline uint16_t
+        cal_checksum(const void *tcpBuf, const void *pseudoIp, size_t pseudoIpLen = PSEUDO_IPV4_HDRLEN) {
+            fields_getter get(tcpBuf);
+
+            return ~sum_all_words(tcpBuf, static_cast<size_t>((uint8_t) get(doff) * 4),
+                                  sum_all_words(pseudoIp, pseudoIpLen));
         }
 
     public:
