@@ -24,17 +24,14 @@ namespace kni {
      * @return an integer[0~15] or -1
      */
     inline char h2i(char c) {
-        if (std::isdigit(c)) {
+        if (std::isdigit(c))
             return c - '0';
-        } else if (std::isalpha(c)) {
-            if (std::isupper(c)) {
-                return static_cast<char>(c - 'A' + 10);
-            } else {
-                return static_cast<char>(c - 'a' + 10);
-            }
-        } else {
+        else if (std::isupper(c))
+            return static_cast<char>(c - 'A' + 10);
+        else if (std::islower(c))
+            return static_cast<char>(c - 'a' + 10);
+        else
             return -1;
-        }
     }
 
     int mac_pton(const char *src, void *dst) {
@@ -43,18 +40,16 @@ namespace kni {
         while (i < MAC_ADDRLEN) {
             auto h = h2i(*(src++));
             auto l = h2i(*(src++));
-            if (h == -1 || l == -1 ||
-                (*(src++) != ':' && i < MAC_ADDRLEN - 1)) {
+            if (h == -1 || l == -1 || (*(src++) != ':' && i < MAC_ADDRLEN - 1))
                 break;
-            }
-            buf[i++] = (((u_char) h) << 4) + (u_char) l;
+            buf[i++] = (((u_char) h) << 4) + (u_char) l; // NOLINT
         }
-        if (i != MAC_ADDRLEN) {
+
+        if (i != MAC_ADDRLEN)
             return 0;
-        } else {
-            memcpy(dst, buf, MAC_ADDRLEN);
-            return 1;
-        }
+
+        memcpy(dst, buf, MAC_ADDRLEN);
+        return 1;
     }
 
     /*
@@ -102,8 +97,7 @@ namespace kni {
         RETURN_NEGATIVE_ON(ret == -1);
 
         timeval slt_tm = {
-                0,
-                ms * 1000
+                0, ms * 1000
         };
 
         constexpr const char *dummys = "AAAABBBBCCCCDDDD";

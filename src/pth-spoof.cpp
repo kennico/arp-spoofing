@@ -10,10 +10,9 @@ void *routine_start_spoof(void *ptr) {
     auto args = (pthargs_spoof *) ptr;
     auto netdb = args->netdb;
 
-    std::unique_ptr<char[]> errbuf(new char[PCAP_ERRBUF_SIZE]);
     std::unique_ptr<u_char[]> sndbuf(new u_char[ETHER_HDRLEN + ARP_HDRLEN]);
 
-    arp_io_packet arp_io(errbuf.get(), PCAP_ERRBUF_SIZE);
+    arp_io_packet arp_io;
     arp_io.prepare(sndbuf.get());
 
     if (!arp_io.open(netdb->devname)) {

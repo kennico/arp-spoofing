@@ -40,10 +40,7 @@ namespace kni {
             auto len = getline(&buf, &bufsize, fp);
             std::string ip(buf, static_cast<unsigned long>(len - 1));
 
-            if (len == -1)
-                break;
-
-            if (getline(&buf, &bufsize, fp) == -1)
+            if (len == -1 || getline(&buf, &bufsize, fp) == -1)
                 break;
 
             mac_t mac;
@@ -52,8 +49,7 @@ namespace kni {
         }
 
         gateway_mac = tmpmap[gateway_ip];
-        ipmac_mapping.clear();  // Discard outdated info
-        ipmac_mapping.insert(tmpmap.begin(), tmpmap.end());
+        ipmac_mapping = std::move(tmpmap);
 
         pclose(fp);
 

@@ -11,7 +11,7 @@
 
 
 TEST(ReverseMap, Map) {
-    kni::reverse_map<char, int> m;
+    kni::reverse_values<char, int> m;
     m.map('a', 1);
     m.map('b', 1);
     m.map('c', 2);
@@ -26,7 +26,7 @@ TEST(ReverseMap, Map) {
 }
 
 TEST(ReverseMap, MapDuplicateKeys) {
-    kni::reverse_map<char, int> m;
+    kni::reverse_values<char, int> m;
     m.map('a', 1);
     m.map('b', 1);
     m.map('c', 2);
@@ -46,7 +46,7 @@ TEST(ReverseMap, MapDuplicateKeys) {
 }
 
 TEST(ReverseMap, Map2) {
-    kni::reverse_map<std::string, int> m;
+    kni::reverse_values<std::string, int> m;
     // Insertion
     m.map("aaa", 1);
     m.map("bbb", 1);

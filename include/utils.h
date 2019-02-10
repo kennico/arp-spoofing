@@ -55,7 +55,7 @@ namespace kni {
 
     class buffered_error {
     public:
-        buffered_error(char *eb, size_t size) : buf(eb), bufsize(size) {
+        explicit buffered_error(char *eb = nullptr, size_t size = 0) : buf(eb), bufsize(size) {
 
         }
 
@@ -82,9 +82,20 @@ namespace kni {
             return buf;
         }
 
+    public:
+        inline void set_buf(char *b, size_t bs) noexcept {
+            buf = b;
+            bufsize = bs;
+        }
+
+        template<size_t bs>
+        inline void set_buf(char (&b)[bs]) {
+            set_buf(b, bs);
+        }
+
     private:
-        char *buf{nullptr};
-        size_t bufsize{0};
+        char *buf;
+        size_t bufsize;
     };
 
     /**
@@ -96,7 +107,7 @@ namespace kni {
      * @tparam V
      */
     template<typename K, typename V>
-    class reverse_map {
+    class reverse_values {
     public:
         /**
          * Insert a key-value pair

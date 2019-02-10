@@ -148,7 +148,7 @@ namespace kni {
     class field_bits {
     public:
 
-        constexpr static size_t MAX_BITS = sizeof(uint32_t) * 4;
+        constexpr static size_t MAX_BITS = sizeof(uint32_t) * 8;
 
         using aligned_type  = typename align_bytes<B>::aligned_type;
         using endian_type   = endianness<aligned_type>;
@@ -423,11 +423,11 @@ namespace kni {
         }
 
     public:
-        field_word htype, ptype;   // Types of hardware address and protocol address
-        field_byte hlen, plen;     // Lengths of hardware address and protocol address
-        field_word oper;           // ARP operation
-        field_mac sha, tha;       // Hardware addresses of sender and target
-        field_ipv4 spa, tpa;       // Protocol addresses of sender and target
+        field_word htype, ptype;    // Types of hardware address and protocol address
+        field_byte hlen, plen;      // Lengths of hardware address and protocol address
+        field_word oper;            // ARP operation
+        field_mac sha, tha;         // Hardware addresses of sender and target
+        field_ipv4 spa, tpa;        // Protocol addresses of sender and target
 
     };
 

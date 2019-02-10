@@ -32,6 +32,7 @@
 
 #include <pcap.h>
 
+// TODO Boost-style logger
 // Thread safety about printf and other posix stream output functions
 // https://stackoverflow.com/a/40186101/8706476
 

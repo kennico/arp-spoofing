@@ -21,14 +21,9 @@ namespace kni {
     class io_packet_base : public buffered_error {
 
     public:
-        /**
-         * Avoid memory management
-         *
-         * @param ebuf
-         * @param esize
-         */
-        io_packet_base(char *ebuf, size_t esize) : buffered_error(ebuf, esize) {
 
+        io_packet_base() : buffered_error(), mem_err(new char[PCAP_ERRBUF_SIZE]) {
+            set_buf(mem_err.get(), PCAP_ERRBUF_SIZE);
         }
 
         /**
@@ -38,7 +33,7 @@ namespace kni {
          * @return
          */
         inline bool open(const std::string &devname) {
-            handle = pcap_open_live(devname.c_str(), 4096, 1, 0, errbuf());
+            handle = pcap_open_live(devname.c_str(), snap_len, 1, 0, errbuf());
             return handle != nullptr;
         }
 
@@ -48,12 +43,37 @@ namespace kni {
             handle = nullptr;
         }
 
-        inline const u_char * next(pcap_pkthdr* pkthdr) {
-            return pcap_next(handle, pkthdr);
+        /**
+         *
+         * @return false indicating an error
+         */
+        inline bool loop_packets() noexcept {
+            while (keep_loop) {
+                cap_packet = pcap_next(handle, &cap_info);
+                if (cap_packet == nullptr) {
+                    snprintf(errbuf(), errbufsize(), "%s", pcap_geterr(handle));
+                    return false;
+                }
+                handle_packet();
+            }
+
+            return true;
+        }
+
+        virtual void loop_break() noexcept {
+            keep_loop = false;
         }
 
     protected:
 
+        virtual void handle_packet() {}
+
+        /**
+         *
+         * @param content
+         * @param pktsize
+         * @return false indicating an error which can be retrieved via error()
+         */
         inline bool send_packet(const u_char *content, int pktsize) {
             int ret = pcap_sendpacket(handle, content, pktsize);
             if (ret == PCAP_ERROR) {
@@ -64,24 +84,21 @@ namespace kni {
             }
         }
 
+    protected:
+        bool keep_loop{true};
+        int snap_len{2048};
+        const u_char *cap_packet{nullptr};
+        pcap_pkthdr cap_info{};
+
     private:
         pcap_t *handle{nullptr};
+        std::unique_ptr<char[]> mem_err;
+
     };
 
 
-    class arp_io_packet :
-            public io_packet_base,
-            public arp_packet {
+    class arp_io_packet : public io_packet_base, public arp_packet {
     public:
-        arp_io_packet(char *ebuf, size_t esize)
-                : io_packet_base(ebuf, esize), arp_packet() {
-
-        }
-
-        template<size_t esize>
-        explicit arp_io_packet(char (&ebuf)[esize]) : arp_io_packet(ebuf, esize) {
-
-        }
 
         void prepare(u_char *buf) {
             this->buf = buf;

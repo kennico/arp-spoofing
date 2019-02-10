@@ -36,6 +36,13 @@ namespace kni {
             }
         }
 
+//        // Forced to use a given port number
+//        inline bool forced_use(port_t p) noexcept {
+//            if (timestamps.has_key(p))
+//                return false;
+//
+//        }
+
         /**
          * Allocate a port
          *
@@ -111,6 +118,6 @@ namespace kni {
         time_t timeout;
 
         std::queue<port_t> free_que;
-        kni::reverse_map<port_t, time_t> timestamps;
+        kni::reverse_values<port_t, time_t> timestamps;
     };
 }

@@ -24,10 +24,11 @@ struct pthargs_spoof {
 struct pthargs_hijack_http {
 
     kni::ipv4_t victim_ip{};
-    uint16_t httpd{};            // The port number httpd is listening
 
-    kni::netinfo *netdb{nullptr};
+    kni::ipv4_t dev_ip{};
+    std::string devname{};
 
-    bool to_be_running{false};
+    kni::io_packet_base *io_packet{};
+
     pthread_t thread_id{};
 };
