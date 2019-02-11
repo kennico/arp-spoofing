@@ -29,12 +29,12 @@ set(NETHEADERS
 add_executable(arpspf
         ${NETHEADERS}
         include/arpspf.h
-        src/main.cpp src/pth-args.h src/pth-spoof.cpp src/pth-hjiack-http.cpp src/fake-port.h)
+        src/main.cpp src/pth-args.h src/pth-spoof.cpp src/pth-hjiack-http.cpp src/fake-port.h src/pth-hijack-http.h)
 target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 
 add_executable(arpspf-test
         ${NETHEADERS}
         src/hdrs.h
-        test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp test/utils_rmap.cpp test/utils_ports.cpp)
+        test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp test/utils_rmap.cpp test/utils_ports.cpp test/hijackhttp_packets.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 

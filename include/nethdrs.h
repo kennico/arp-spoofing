@@ -305,7 +305,7 @@ namespace kni {
             return *this;
         }
 
-    public:
+    private:
 
         size_t acc_len; // Measured in bits.
 
