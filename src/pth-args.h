@@ -15,7 +15,7 @@ struct pthargs_spoof {
     std::string victim_ip{};
     kni::mac_t victim_mac{};
 
-    kni::netinfo *netdb{nullptr};
+    kni::lan_info *lan{nullptr};
 
     bool to_be_running{false};
     pthread_t thread_id{};
@@ -24,8 +24,8 @@ struct pthargs_spoof {
 struct pthargs_hijack_http {
 
     kni::ipv4_t victim_ip{};
+    kni::lan_info *lan;
 
-    kni::ipv4_t dev_ip{};
     std::string devname{};
 
     kni::io_packet_base *io_packet{};

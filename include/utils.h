@@ -14,6 +14,8 @@
 #include <cstring>
 #include <cassert>
 
+#include <pcap.h>
+
 namespace kni {
 
     inline int count_bits(unsigned int n) {
@@ -53,50 +55,45 @@ namespace kni {
         return (~sum_all_words(buf, bytes));
     }
 
-    class buffered_error {
+    class managed_error {
     public:
-        explicit buffered_error(char *eb = nullptr, size_t size = 0) : buf(eb), bufsize(size) {
+        explicit managed_error(size_t size) : mem(new char[size]), mem_len(size) {
 
         }
 
-        inline const char *error() const noexcept {
-            return buf;
+        inline const char *err() const noexcept {
+            return mem.get();
+        }
+
+        inline char *err() noexcept {
+            return mem.get();
         }
 
         inline size_t errbufsize() const noexcept {
-            return bufsize;
+            return mem_len;
         }
-
         /**
          * Retrieve and store library or system error information via errno
          * @return a buffer containing error information
          */
         inline const char *getsyserr() noexcept {
-            strerror_r(errno, errbuf(), errbufsize());
-            return errbuf();
-        }
-
-    protected:
-
-        inline char *errbuf() noexcept {
-            return buf;
-        }
-
-    public:
-        inline void set_buf(char *b, size_t bs) noexcept {
-            buf = b;
-            bufsize = bs;
-        }
-
-        template<size_t bs>
-        inline void set_buf(char (&b)[bs]) {
-            set_buf(b, bs);
+            strerror_r(errno, err(), errbufsize());
+            return err();
         }
 
     private:
-        char *buf;
-        size_t bufsize;
+        std::unique_ptr<char[]> mem;
+        size_t mem_len;
     };
+
+    class pcap_error : public managed_error {
+    public:
+        explicit pcap_error(size_t size = PCAP_ERRBUF_SIZE) : managed_error(size) {
+
+        }
+
+    };
+
 
     /**
      * TODO Impl iterator?

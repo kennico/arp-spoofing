@@ -3,7 +3,7 @@
 //
 
 #include "hdrs.h"
-#include "netinfo.h"
+#include "lan_info.h"
 #include "pkt.h"
 
 

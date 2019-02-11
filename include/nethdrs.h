@@ -545,4 +545,11 @@ namespace kni {
         arp_header arpHdr{};
     };
 
+    struct tcp_packet {
+        eth_header ethHdr;
+        ipv4_header ipHdr;
+        tcp_header tcpHdr;
+        pseudo_ipv4 pseudo;
+    };
+
 }

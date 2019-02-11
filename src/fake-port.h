@@ -21,7 +21,9 @@ namespace kni {
          */
         explicit fake_port_manager(uint32_t f = 1024, uint32_t s = 0x10000, time_t t = 5) :
                 from(f), stop(s), timeout(t) {
-            assert(f < s && f > 0 && s < 0x10000);
+            assert(f < s);
+            assert(f > 0);
+            assert(s <= 0x10000);
         }
 
         /**

@@ -32,12 +32,8 @@ namespace kni {
 
     using ipmac_map_t = std::map<std::string, mac_t>;
 
-    class netinfo : public buffered_error {
+    class lan_info : public pcap_error {
     public:
-
-        netinfo(char *errbuf, size_t errbufsize) : buffered_error(errbuf, errbufsize) {
-
-        }
 
         /**
          * Obtain device's info
@@ -46,6 +42,8 @@ namespace kni {
          * @return
          */
         bool set_dev(const char *dev);
+
+        bool update_arp(const char *ip);
 
         bool update_arp();
 
@@ -65,13 +63,13 @@ namespace kni {
         }
 
     public:
-        devinfo_t devinfo{};
         std::string gateway_ip{};
-        std::string devname{};
         mac_t gateway_mac{};
-
-    private:
-
+        devinfo_t dev{};
+        std::string devname{};
+#ifndef KNI_DEBUG_TEST
+    protected:
+#endif
         ipmac_map_t ipmac_mapping{};
 
     };

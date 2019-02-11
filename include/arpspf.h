@@ -12,28 +12,23 @@
 
 #include "pkt.h"
 #include "utils.h"
-#include "netinfo.h"
+#include "lan_info.h"
 #include "nethdrs.h"
 
 namespace kni {
 
 
-    class io_packet_base : public buffered_error {
+    class io_packet_base : public pcap_error {
 
     public:
-
-        io_packet_base() : buffered_error(), mem_err(new char[PCAP_ERRBUF_SIZE]) {
-            set_buf(mem_err.get(), PCAP_ERRBUF_SIZE);
-        }
-
-        /**
+/**
          * Open a device
          *
          * @param devname
          * @return
          */
         inline bool open(const std::string &devname) {
-            handle = pcap_open_live(devname.c_str(), snap_len, 1, 0, errbuf());
+            handle = pcap_open_live(devname.c_str(), snap_len, 1, 0, err());
             return handle != nullptr;
         }
 
@@ -51,7 +46,7 @@ namespace kni {
             while (keep_loop) {
                 cap_packet = pcap_next(handle, &cap_info);
                 if (cap_packet == nullptr) {
-                    snprintf(errbuf(), errbufsize(), "%s", pcap_geterr(handle));
+                    snprintf(err(), errbufsize(), "%s", pcap_geterr(handle));
                     return false;
                 }
                 handle_packet();
@@ -64,9 +59,11 @@ namespace kni {
             keep_loop = false;
         }
 
+#ifndef KNI_DEBUG
     protected:
+#endif
 
-        virtual void handle_packet() {}
+        virtual void handle_packet() = 0;
 
         /**
          *
@@ -77,14 +74,16 @@ namespace kni {
         inline bool send_packet(const u_char *content, int pktsize) {
             int ret = pcap_sendpacket(handle, content, pktsize);
             if (ret == PCAP_ERROR) {
-                snprintf(errbuf(), errbufsize(), "%s", pcap_geterr(handle));
+                snprintf(err(), errbufsize(), "%s", pcap_geterr(handle));
                 return false;
             } else {
                 return true;
             }
         }
 
+#ifndef KNI_DEBUG_TEST
     protected:
+#endif
         bool keep_loop{true};
         int snap_len{2048};
         const u_char *cap_packet{nullptr};
@@ -92,7 +91,6 @@ namespace kni {
 
     private:
         pcap_t *handle{nullptr};
-        std::unique_ptr<char[]> mem_err;
 
     };
 

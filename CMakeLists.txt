@@ -18,12 +18,12 @@ include(find_libpcap.cmake)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 set(NETHEADERS
-        include/netinfo.h
+        include/lan_info.h
         include/pkt.h
         include/nethdrs.h
         include/utils.h
         src/hdrs.h
-        src/misc.cpp src/gateway.cpp src/netinfo.cpp)
+        src/misc.cpp src/gateway.cpp src/lan_info.cpp)
 
 
 add_executable(arpspf
