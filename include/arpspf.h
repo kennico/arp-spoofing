@@ -50,6 +50,7 @@ namespace kni {
                     return false;
                 }
                 handle_packet();
+                cap_packet = nullptr;
             }
 
             return true;
@@ -63,7 +64,9 @@ namespace kni {
     protected:
 #endif
 
-        virtual void handle_packet() = 0;
+        virtual void handle_packet() {
+
+        }
 
         /**
          *
@@ -81,7 +84,7 @@ namespace kni {
             }
         }
 
-#ifndef KNI_DEBUG_TEST
+#ifndef KNI_DEBUG_TEST_PREVENT_SEND
     protected:
 #endif
         bool keep_loop{true};

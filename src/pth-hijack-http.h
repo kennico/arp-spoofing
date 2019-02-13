@@ -47,8 +47,9 @@ namespace kni {
             victims.insert(ip);
         }
 
-    private:
-
+#ifndef KNI_DEBUG_TEST_PREVENT_SEND
+        protected:
+#endif
         inline void send_fake_packet(const endpoint_t &from, const endpoint_t &to) {
             memcpy(send_buf.get(), cap_packet, cap_info.caplen);
 
@@ -80,87 +81,128 @@ namespace kni {
             set(tcpHdr.dst, to.port);
             set(tcpHdr.check, 0);   // Zero the checksum
             set(tcpHdr.check, tcpHdr.cal_checksum(set.from(), buf));
-#ifndef KNI_DEBUG_TEST
+#ifndef KNI_DEBUG_TEST_PREVENT_SEND
             if (!send_packet(send_buf.get(), cap_info.caplen))
                 KNI_LOG_ERROR("%s", err());
 #endif
         }
 
-        inline void tcp_mapping_release(port_t port) {
-            port_manager.free(port);    // Possibly duplicate free()
+        /**
+         *
+         * @param iter an iterator of conn_pairs
+         */
+        inline void remove_mapping_info(std::map<port_t, conn_pair_t>::const_iterator iter) {
+            auto port = iter->first;
+            port_manager.free(port);
 
-            auto iter = conn_pairs.find(port);
+            auto &src = iter->second.src;
+            auto &dst = iter->second.dst;
+            KNI_LOG_DEBUG("Port [%d] released from %s:%d -> %s:%d", port, to_string(src.ip).c_str(), src.port,
+                          to_string(dst.ip).c_str(), dst.port);
+
+            closed_end.erase(src);
+            closed_end.erase(dst);
             fake_ports.erase(iter->second.src);
             conn_pairs.erase(iter);
-
-            KNI_LOG_DEBUG("TCP FIN %s:%d -> %s:%d", to_string(sender.ip).c_str(), sender.port,
-                          to_string(receiver.ip).c_str(), receiver.port);
         }
 
-        inline void tcp_mapping_refresh(port_t port) {
-            port_manager.refresh(port);
+        /**
+         *
+         * @param from the endpoint to be marked as closed
+         * @param another
+         * @return true if another endpoint is already marked as closed
+         */
+        inline bool set_tcp_fin(const endpoint_t &from, const endpoint_t &another) {
+            closed_end.insert(from);
+            return closed_end.count(another) == 1;
         }
 
+        inline void send_packet_tcp_rst() {
+            // TODO Send TCP RST and return
+        }
+
+        /**
+         * Filter and forward TCP traffic from victims
+         *
+         * @param get a fields_getter object to be used on TCP header
+         */
         inline void forward_tcp_victim(fields_getter get) {
             auto iter = fake_ports.find(sender);
             port_t port;
 
             if (iter == fake_ports.end()) {
-                // If victim's endpoint expects to send a segment after our own timeout
-                // TODO Send TCP RST and return
                 if (!(get(tcpHdr.flags) & tcp_header::syn)) {
+                    // An endpoint of a victim expects to send a segment after our own timeout
                     KNI_LOG_WARN("Port times out for packet from %s:%d", to_string(sender.ip).c_str(), sender.port);
+                    send_packet_tcp_rst();
                     return;
                 }
                 // TCP SYN
                 // Allocate a port number
-                port = allocate_fake_port();
+                port = assign_fake_port();
             } else {
                 port = iter->second;
-                if (get(tcpHdr.flags) & tcp_header::fin)
-                    tcp_mapping_release(port);
+                // TCP FIN or RST
+                // Remove port mapping info if both sides agree to close connection
+                if (get(tcpHdr.flags) & (tcp_header::fin | tcp_header::rst) && set_tcp_fin(sender, receiver)) // NOLINT
+                    remove_mapping_info(conn_pairs.find(port));
                 else
-                    tcp_mapping_refresh(port);
+                    port_manager.refresh(port);
             }
 
             send_fake_packet({lan->dev.ip, port}, httpd);
         }
 
+        /**
+         * Forward TCP traffic from httpd
+         *
+         * @param get a fields_getter object to be used on TCP header
+         */
         inline void forward_tcp_httpd(fields_getter get) {
-            auto iter = conn_pairs.find(get(tcpHdr.dst));  // Retrieve the port mapping info
+            // Retrieve the port mapping info
+            auto iter = conn_pairs.find(get(tcpHdr.dst));
             if (iter == conn_pairs.end()) {
                 // The original port times out. Drop the packet
-                // TODO Send TCP RST and return
                 KNI_LOG_WARN("Port times out from \"httpd\" to [%d]. ", get(tcpHdr.dst));
+                send_packet_tcp_rst();
                 return;
             }
 
-            if (get(tcpHdr.flags) & tcp_header::fin) { // Connection termination
-                tcp_mapping_release(iter->first);
-            } else
-                tcp_mapping_refresh(iter->first);
+            auto &src = iter->second.dst;
+            auto &dst = iter->second.src;
 
-            send_fake_packet(iter->second.dst, iter->second.src);
+            // TCP SYN or RST
+            if (get(tcpHdr.flags) & (tcp_header::fin | tcp_header::rst) &&
+                set_tcp_fin(src, dst))  // Connection termination // NOLINT
+                remove_mapping_info(iter);
+            else
+                port_manager.refresh(iter->first);
+
+            send_fake_packet(src, dst);
         }
 
-        inline port_t allocate_fake_port() {
-            auto port = port_manager.alloc();        // Allocate a fake port number
+        /**
+         * Allocate a fake port number
+         *
+         * @return port number
+         */
+        inline port_t assign_fake_port() {
+            auto port = port_manager.alloc();
             auto iter = conn_pairs.find(port);
 
-            if (iter == conn_pairs.end()) {     // This port number can be used
-                fake_ports[sender] = port;
-                conn_pairs[port] = {sender, receiver};
-
-                KNI_LOG_DEBUG("Port [%d] assigned to %s:%d", port, to_string(sender.ip).c_str(), sender.port);
-            } else {
-                // The port was used before and times out.
-                // Erase the outdated record
+            if (iter != conn_pairs.end()) {
+                // The port was used before and times out now.
+                // Erase the associated out-of-time information.
                 // This ensures that the outdated port will not be used in an incomplete TCP connection
-                fake_ports.erase(iter->second.src);
-                conn_pairs.erase(iter);
-
-                KNI_LOG_DEBUG("Port [%d] reused for %s:%d", iter->first, to_string(sender.ip).c_str(), sender.port);
+                KNI_LOG_DEBUG("Port [%d] reused", iter->first);
+                remove_mapping_info(iter);
             }
+
+            // This port number can be used
+            fake_ports[sender] = port;
+            conn_pairs[port] = {sender, receiver};
+
+            KNI_LOG_DEBUG("Port [%d] assigned to %s:%d", port, to_string(sender.ip).c_str(), sender.port);
 
             return port;
         }
@@ -183,9 +225,11 @@ namespace kni {
                 forward_tcp_victim(get);
             else if (sender == httpd)
                 forward_tcp_httpd(get);
-        }
 
-#ifdef KNI_DEBUG_TEST
+            sender = receiver = {};     // TODO Necessary to clear data?
+        };
+
+#ifdef KNI_DEBUG_TEST_PREVENT_SEND
     public:
 #else
         protected:
@@ -194,9 +238,11 @@ namespace kni {
 
         const lan_info *lan;
 
-        std::set<ipv4_t> victims{};
-        std::map<endpoint_t, port_t> fake_ports{};
-        std::map<port_t, conn_pair_t> conn_pairs{};
+        std::set<ipv4_t> victims;
+
+        std::set<endpoint_t> closed_end;
+        std::map<endpoint_t, port_t> fake_ports;
+        std::map<port_t, conn_pair_t> conn_pairs;
 
         fake_port_manager port_manager;
 

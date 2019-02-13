@@ -35,6 +35,6 @@ target_link_libraries(arpspf ${PCAP_LIBRARY} Threads::Threads)
 add_executable(arpspf-test
         ${NETHEADERS}
         src/hdrs.h
-        test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp test/utils_rmap.cpp test/utils_ports.cpp test/hijackhttp_packets.cpp)
+        test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp test/utils_rmap.cpp test/utils_ports.cpp test/hijackhttp_packets.cpp test/hijackhttp_data.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 

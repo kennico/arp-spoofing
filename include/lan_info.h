@@ -58,8 +58,18 @@ namespace kni {
             return ipmac_mapping;
         }
 
+        /**
+         * Map an IPv4 string to an MAC address
+         *
+         * @param ip
+         * @return the MAC address of gateway if such ip has not been discovered yet
+         */
         inline const mac_t &map(const std::string &ip) const {
-            return ipmac_mapping.at(ip);
+            auto find = ipmac_mapping.find(ip);
+            if (find == ipmac_mapping.end())
+                return gateway_mac;
+            else
+                return find->second;
         }
 
     public:
@@ -67,7 +77,7 @@ namespace kni {
         mac_t gateway_mac{};
         devinfo_t dev{};
         std::string devname{};
-#ifndef KNI_DEBUG_TEST
+#ifndef KNI_DEBUG_TEST_PREVENT_SEND
     protected:
 #endif
         ipmac_map_t ipmac_mapping{};
