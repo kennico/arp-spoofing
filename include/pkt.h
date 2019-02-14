@@ -48,6 +48,10 @@ namespace kni {
 
     std::string to_string(const mac_t &);
 
+    /**
+     *
+     * @return 1 on success
+     */
     int mac_pton(const char *, void *);
 
     char *mac_ntop(const void *, char *, socklen_t);

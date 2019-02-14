@@ -63,70 +63,34 @@ namespace kni {
         return buf;
     }
 
-    int get_gateway_ip(const char *devname, int attempts, int ms) {
-        auto sender = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sender == -1)
-            return -1;
-        /*
-         * https://stackoverflow.com/a/13548622/8706476
-         * socket(AF_INET, SOCK_RAW, 0)
-         * Operation not permitted
-         */
-        auto listener = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-        if (listener == -1)
+    int get_gateway_ip(const char *devname) {
+        char command[64] = {0};
+        sprintf(command, R"(route -n | grep -P '^0\.0\.0\.0.+UG.+%s$')", devname);
+        KNI_LOG_DEBUG("%s - Command: %s", __FUNCTION__, command);
+
+        auto fp = popen(command, "r");
+        if (fp == nullptr)
             return -1;
 
-        auto fds = {sender, listener};
-        if (devname != nullptr) {
-            for (auto fd:fds) {
-                if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, devname, static_cast<socklen_t>(strlen(devname) + 1)) ==
-                    -1)
-                    return -1;
-            }
-        }
-
-        int ttl = 1;    // Unable to use the ttl value of 0; setsockopt returns -1
-        if (setsockopt(sender, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) == -1)
+        char *line_buf = nullptr;
+        size_t bufsize = 0;
+        auto len = getline(&line_buf, &bufsize, fp);
+        if (len == -1)
             return -1;
 
-        sockaddr_in dummy_addr{};
-        dummy_addr.sin_family = AF_INET;
-        dummy_addr.sin_port = htons(80);
-        inet_pton(AF_INET, "8.8.8.8", &dummy_addr.sin_addr);
+        std::string line(line_buf);
+        auto ws_pos = line.find_first_of(' ');
+        auto nu_beg = line.find_first_not_of(' ', ws_pos);
+        auto nu_end = line.find_first_of(' ', nu_beg);
 
-        if (connect(sender, reinterpret_cast<const sockaddr *>(&dummy_addr), sizeof(dummy_addr)) == -1)
-            return -1;
+        assert(nu_beg < nu_end);
+        int ret = -1;
+        inet_pton(AF_INET, line.substr(nu_beg, nu_end - nu_beg).c_str(), &ret);
 
-        timeval slt_tm = {
-                0, ms * 1000
-        };
+        free(line_buf);
+        pclose(fp);
 
-        constexpr const char *dummys = "AAAABBBBCCCCDDDD";
-        constexpr const size_t dummys_len = strlen(dummys);
-
-        sockaddr_in return_addr{};
-
-        ssize_t bytes = 0;
-        while (attempts-- > 0 && bytes != dummys_len) {
-            bytes = send(sender, dummys, dummys_len, 0);
-            if (bytes == -1)
-                continue;
-            // calling select on icmp socket always returns 0 indicating timeouts.
-            select(0, nullptr, nullptr, nullptr, &slt_tm);
-
-            char buf[dummys_len];
-            socklen_t len = sizeof(return_addr);
-            bytes = recvfrom(listener, buf, sizeof(buf), 0, reinterpret_cast<sockaddr *>(&return_addr), &len);
-        }
-
-        for (auto fd:fds)
-            close(fd);
-
-        if (bytes == -1)
-            return -1;
-        else
-            return *(int *) &return_addr.sin_addr;
-
+        return ret;
     }
 
     int get_device_info(const char *devname, devinfo_t *pinfo, char *errbuf) {
