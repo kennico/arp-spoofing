@@ -22,14 +22,17 @@ namespace kni {
 
     public:
 
+        constexpr static size_t SNAP_LEN = 2048;
+
         /**
-         * Open a device
+         * Open a device.
+         * Privilege is required.
          *
          * @param devname
          * @return
          */
         inline bool open(const char *devname) {
-            handle = pcap_open_live(devname, snap_len, 1, 0, err());
+            handle = pcap_open_live(devname, SNAP_LEN, 1, 0, err());
             return handle != nullptr;
         }
 
@@ -92,7 +95,6 @@ namespace kni {
     protected:
 #endif
         bool keep_loop{true};
-        int snap_len{2048};
         const u_char *cap_packet{nullptr};
         pcap_pkthdr cap_info{};
 
@@ -108,7 +110,9 @@ namespace kni {
 
         }
 
+#ifndef KNI_DEBUG_TEST_PREVENT_SEND
     protected:
+#endif
         std::unique_ptr<u_char[]> send_buf;
         size_t send_bufsize;
     };

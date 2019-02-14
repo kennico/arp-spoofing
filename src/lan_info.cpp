@@ -8,12 +8,13 @@
 
 namespace kni {
 
-    bool lan_info::fetch_arp() {
-        char line_buf[128] = "arp -n | "
-                             R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
-        KNI_LOG_DEBUG("Command: %s", line_buf);
 
-        auto fp = popen(line_buf, "r");
+    bool lan_info::fetch_arp() {
+        char command[128] = "arp -n | awk '$0 !~ \"incomplete\"' | "
+                             R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
+        KNI_LOG_DEBUG("Command: %s", command);
+
+        auto fp = popen(command, "r");
         if (fp == nullptr) {
             getsyserr();
             return false;
@@ -21,24 +22,30 @@ namespace kni {
 
         ipmac_map_t tmpmap;
 
-        char *buf = line_buf;
-        size_t bufsize = sizeof(line_buf);
+        char *buf = nullptr;
+        size_t bufsize = 0;
 
         while (true) {
             auto len = getline(&buf, &bufsize, fp);
-            std::string ip(line_buf, static_cast<unsigned long>(len - 1));
+            if (len == -1)
+                break;
 
-            if (len == -1 || getline(&buf, &bufsize, fp) == -1)
+            std::string ip(buf, static_cast<unsigned long>(len - 1));
+
+            if (getline(&buf, &bufsize, fp) == -1)  // This should not happen
                 break;
 
             mac_t mac;
-            assert(mac_pton(buf, &mac));
+            auto ret = mac_pton(buf, &mac);
+            assert(ret == 1);
             tmpmap[ip] = mac;
         }
 
+        tmpmap[kni::to_string(dev.ip)] = dev.hw_addr;
         gateway_mac = tmpmap[gateway_ip];
         ipmac_mapping = std::move(tmpmap);
 
+        free(buf);
         pclose(fp);
 
         return true;

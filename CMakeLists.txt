@@ -39,3 +39,9 @@ add_executable(arpspf-test
         test/usage_tmpl_traits.cpp test/nethdrs_fields.cpp test/nethdrs_headers.cpp test/nethdrs_packets.cpp test/utils_rmap.cpp test/utils_ports.cpp test/hijackhttp_data.cpp test/utils_misc.cpp)
 target_link_libraries(arpspf-test GTest::GTest GTest::Main ${PCAP_LIBRARY})
 
+add_executable(arp-spoof
+        ${NETHEADERS}
+        include/arpspf.h
+        src/arp-spoof.cpp)
+
+target_link_libraries(arp-spoof ${PCAP_LIBRARY})
