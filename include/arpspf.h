@@ -21,17 +21,21 @@ namespace kni {
     class io_packet_base : public pcap_error {
 
     public:
-/**
+
+        /**
          * Open a device
          *
          * @param devname
          * @return
          */
-        inline bool open(const std::string &devname) {
-            handle = pcap_open_live(devname.c_str(), snap_len, 1, 0, err());
+        inline bool open(const char *devname) {
+            handle = pcap_open_live(devname, snap_len, 1, 0, err());
             return handle != nullptr;
         }
 
+        /**
+         * Check if the handle is null before closing it
+         */
         inline void close() {
             if (handle)
                 pcap_close(handle);
@@ -97,14 +101,23 @@ namespace kni {
 
     };
 
+    class io_packet_buf : public io_packet_base {
+    public:
+        explicit io_packet_buf(size_t bufsize) :
+                io_packet_base(), send_buf(new u_char[bufsize]), send_bufsize(bufsize) {
 
-    class arp_io_packet : public io_packet_base, public arp_packet {
+        }
+
+    protected:
+        std::unique_ptr<u_char[]> send_buf;
+        size_t send_bufsize;
+    };
+
+    class arp_io_packet : public io_packet_buf, public arp_packet {
     public:
 
-        void prepare(u_char *buf) {
-            this->buf = buf;
-
-            setter set(buf);
+        arp_io_packet() : io_packet_buf(ETHER_HDRLEN + ARP_HDRLEN), arp_packet() {
+            setter set(send_buf.get());
             set(ethHdr.type, ETH_P_ARP);
 
             set.incr(ETHER_HDRLEN);
@@ -127,7 +140,7 @@ namespace kni {
          */
         inline bool reply(const std::string &sender_ip, const mac_t &sender_mac, const std::string &target_ip,
                           const mac_t &target_mac) {
-            setter set(buf);
+            setter set(send_buf.get());
             set(ethHdr.src, sender_mac);
             set(ethHdr.dst, target_mac);
 
@@ -138,12 +151,8 @@ namespace kni {
             set(arpHdr.tha, target_mac);
             set(arpHdr.oper, ARPOP_REPLY);
 
-            return send_packet(buf, ETHER_HDRLEN + ARP_HDRLEN);
+            return send_packet(send_buf.get(), ETHER_HDRLEN + ARP_HDRLEN);
         }
-
-    private:
-
-        u_char *buf{nullptr};
 
     };
 }

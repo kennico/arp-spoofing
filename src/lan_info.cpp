@@ -6,39 +6,27 @@
 #include "utils.h"
 #include "lan_info.h"
 
-/*
- * Perform LAN host discovery using nmap
- */
-constexpr auto fmt_nmap_lan = "nmap -sn %s/%d";
-constexpr auto grep_ip_mac = R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
-
 namespace kni {
 
-    bool lan_info::update_arp() {
-        auto subnet_mask = *(unsigned int *) &dev.ip_netmask;
-        subnet_mask = ntohl(subnet_mask);
+    bool lan_info::fetch_arp() {
+        char line_buf[128] = "arp -n | "
+                             R"(grep -oP '(\w{2}:){5}\w{2}|((\d+\.){3}\d+)')";
+        KNI_LOG_DEBUG("Command: %s", line_buf);
 
-        char script_line[128];
-        sprintf(script_line, fmt_nmap_lan, to_string(dev.ip).c_str(), count_bits(subnet_mask));
-        sprintf(script_line + strlen(script_line), " | %s", grep_ip_mac);
-        KNI_LOG_DEBUG("Command: %s", script_line);
-
-        auto fp = popen(script_line, "r");
+        auto fp = popen(line_buf, "r");
         if (fp == nullptr) {
             getsyserr();
             return false;
         }
 
         ipmac_map_t tmpmap;
-        /*
-         * Each line is guaranteed to be less than 128 bytes
-         */
-        char *buf = script_line;
-        size_t bufsize = sizeof(script_line);
+
+        char *buf = line_buf;
+        size_t bufsize = sizeof(line_buf);
 
         while (true) {
             auto len = getline(&buf, &bufsize, fp);
-            std::string ip(buf, static_cast<unsigned long>(len - 1));
+            std::string ip(line_buf, static_cast<unsigned long>(len - 1));
 
             if (len == -1 || getline(&buf, &bufsize, fp) == -1)
                 break;
@@ -56,6 +44,16 @@ namespace kni {
         return true;
     }
 
+    /**
+     *
+     * cat /proc/net/route gives output like:
+     * Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+    wlx502b73dc543f	00000000	012BA8C0	0003	0	0	600	00000000	0	0	0
+    wlx502b73dc543f	0000FEA9	00000000	0001	0	0	1000	0000FFFF	0	0	0
+    wlx502b73dc543f	002BA8C0	00000000	0001	0	0	600	00FFFFFF	0	0	0
+     *
+     * @return
+     */
     bool lan_info::update_gateway_ip() {
         auto ret = get_gateway_ip(devname.c_str());
 

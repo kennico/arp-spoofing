@@ -252,7 +252,8 @@ namespace kni {
         }
 
         inline void operator()(void *b, const field_ipv4 &, const char *ip) const {
-            assert(inet_pton(AF_INET, ip, b));
+            auto ret = inet_pton(AF_INET, ip, b);
+            assert(ret == 1);
         }
 
         inline void operator()(void *b, const field_ipv4 &arg, const std::string &ip) const {
@@ -268,15 +269,16 @@ namespace kni {
     struct field_functor<field_mac> {
 
         inline void operator()(void *b, const field_mac &, const char *mac) {
-            assert(mac_pton(mac, b));
+            auto ret = mac_pton(mac, b);
+            assert(ret == 1);
         }
 
-        inline void operator()(void *b, const field_mac &, const std::string &mac) {
-            assert(mac_pton(mac.c_str(), b));
+        inline void operator()(void *b, const field_mac &arg, const std::string &mac) {
+            this->operator()(b, arg, mac.c_str());
         }
 
         inline void operator()(void *b, const field_mac &, const void *mac) {
-            assert(memcpy(b, mac, 6));
+            memcpy(b, mac, 6);
         }
 
         inline void operator()(void *b, const field_mac &arg, const mac_t &mac) {

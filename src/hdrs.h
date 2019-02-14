@@ -10,6 +10,7 @@
 #include <set>
 #include <initializer_list>
 #include <algorithm>
+#include <memory>
 
 #include <cstring>
 #include <cctype>
@@ -21,6 +22,8 @@
 
 
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
@@ -63,7 +66,7 @@
     fprintf(stdout, __VA_ARGS__);\
 }while(false)
 
-#define KNI_FATAL_ERROR(string) do {\
-    KNI_LOG_ERROR("Fatal error - %s\n", string);\
+#define KNI_FATAL_ERROR(...) do {\
+    fprintf(stderr, "FATAL: %s() in %s(%d)\n\t",__FUNCTION__, __FILE__, __LINE__);fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");\
     exit(1);\
 } while(false)

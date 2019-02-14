@@ -77,7 +77,15 @@ namespace kni {
          * @return a buffer containing error information
          */
         inline const char *getsyserr() noexcept {
-            strerror_r(errno, err(), errbufsize());
+            /*
+             * Man strerror_r:
+             *
+             * The GNU-specific strerror_r() returns a pointer to a string containing the error message.
+             * This may be either a pointer to a  string that  the  function  stores  in  buf,
+             * or a pointer to some (immutable) static string (in which case buf is unused).
+             */
+            // strerror_r(errno, err(), errbufsize());
+            memcpy(err(), strerror(errno), errbufsize());
             return err();
         }
 

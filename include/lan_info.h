@@ -32,6 +32,9 @@ namespace kni {
 
     using ipmac_map_t = std::map<std::string, mac_t>;
 
+    /**
+     * TODO Discover hosts and obtain ARP information
+     */
     class lan_info : public pcap_error {
     public:
 
@@ -43,14 +46,11 @@ namespace kni {
          */
         bool set_dev(const char *dev);
 
-        bool update_arp(const char *ip);
-
-        bool update_arp();
+        bool fetch_arp();
 
         bool update_gateway_ip();
 
-
-        inline bool cached(const std::string &ip) const noexcept {
+        inline bool is_cached(const std::string &ip) const noexcept {
             return ipmac_mapping.count(ip) > 0;
         }
 

@@ -64,37 +64,38 @@ namespace kni {
     }
 
     int get_gateway_ip(const char *devname, int attempts, int ms) {
-
         auto sender = socket(AF_INET, SOCK_DGRAM, 0);
-        RETURN_NEGATIVE_ON(sender == -1);
+        if (sender == -1)
+            return -1;
         /*
          * https://stackoverflow.com/a/13548622/8706476
          * socket(AF_INET, SOCK_RAW, 0)
+         * Operation not permitted
          */
         auto listener = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-        RETURN_NEGATIVE_ON(listener == -1);
+        if (listener == -1)
+            return -1;
 
-        auto ret = 0;
         auto fds = {sender, listener};
         if (devname != nullptr) {
             for (auto fd:fds) {
-                ret = setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, devname, static_cast<socklen_t>(strlen(devname) + 1));
-                RETURN_NEGATIVE_ON(ret == -1);
+                if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, devname, static_cast<socklen_t>(strlen(devname) + 1)) ==
+                    -1)
+                    return -1;
             }
         }
 
         int ttl = 1;    // Unable to use the ttl value of 0; setsockopt returns -1
-        ret = setsockopt(sender, SOL_IP, IP_TTL, &ttl, sizeof(ttl));
-        RETURN_NEGATIVE_ON(ret == -1);
-
+        if (setsockopt(sender, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) == -1)
+            return -1;
 
         sockaddr_in dummy_addr{};
         dummy_addr.sin_family = AF_INET;
         dummy_addr.sin_port = htons(80);
         inet_pton(AF_INET, "8.8.8.8", &dummy_addr.sin_addr);
 
-        ret = connect(sender, reinterpret_cast<const sockaddr *>(&dummy_addr), sizeof(dummy_addr));
-        RETURN_NEGATIVE_ON(ret == -1);
+        if (connect(sender, reinterpret_cast<const sockaddr *>(&dummy_addr), sizeof(dummy_addr)) == -1)
+            return -1;
 
         timeval slt_tm = {
                 0, ms * 1000
