@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
         KNI_FATAL_ERROR("Can not install interrupt handler: %s", strerror(errno));
 
     int opt;
-    int seconds = 10, npackets = 10;
+    int seconds = 10, npackets = -1;
     bool twoway = false;
     const char *devname = nullptr;
     while ((opt = getopt(argc, argv, "n:c:t:e:")) != -1) {
