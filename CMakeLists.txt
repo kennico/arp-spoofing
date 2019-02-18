@@ -23,7 +23,7 @@ set(NETHEADERS
         include/nethdrs.h
         include/utils.h
         src/hdrs.h
-        src/misc.cpp src/gateway.cpp src/lan_info.cpp)
+        src/utils.cpp src/lan_info.cpp)
 
 
 #add_executable(arpspf

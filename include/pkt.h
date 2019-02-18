@@ -48,9 +48,11 @@ namespace kni {
 
     std::string to_string(const mac_t &);
 
+    std::string subnet(const ipv4_t &ip, const ipv4_t &mask);
+
     /**
      *
-     * @return 1 on success
+     * @return 1 on success or 0 on failure
      */
     int mac_pton(const char *, void *);
 

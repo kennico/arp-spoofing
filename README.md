@@ -4,14 +4,14 @@ Perform LAN ARP spoofing against a given host
 
 ## Options and flags
 
-- `-t`: attack both gateway and the given host
+- `-t`: target on both gateway and the given host
 - `-n`: [seconds] time interval between two packet
 - `-c`: [count] how many packets are to be sent 
 - `-e`: [iface] device name
 
 ## Usage
 ```sh
-sudo arp-spoof 192.168.43.79 -c 5
+sudo arp-spoof 192.168.43.79 -c 5 -e wlan0
 ```
 
 ## Misc

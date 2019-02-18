@@ -81,8 +81,8 @@ namespace kni {
              * Man strerror_r:
              *
              * The GNU-specific strerror_r() returns a pointer to a string containing the error message.
-             * This may be either a pointer to a  string that  the  function  stores  in  buf,
-             * or a pointer to some (immutable) static string (in which case buf is unused).
+             * This may be EITHER a pointer to a  string that  the  function  stores  in  buf,
+             * OR a pointer to some (immutable) static string (in which case buf is UNUSED).
              */
             // strerror_r(errno, err(), errbufsize());
             memcpy(err(), strerror(errno), errbufsize());
@@ -102,9 +102,41 @@ namespace kni {
 
     };
 
+    class command {
+    public:
+
+        explicit command(const char *cmd) : cmd_line(cmd) {
+
+        }
+
+        /**
+         *
+         * @tparam function_type
+         * @param handler
+         * @return true if there is no system error
+         */
+        template<typename function_type>
+        inline bool read_line(function_type handler) {
+            auto fp = popen(cmd_line, "r");
+            if (fp == nullptr)
+                return false;
+
+            char *pbuf = nullptr;
+            size_t bufsize = 0;
+            ssize_t len;
+            while ((len = getline(&pbuf, &bufsize, fp)) != -1 && handler((const char *) pbuf, len)) {}
+
+            free(pbuf);
+            return pclose(fp) != -1;
+        }
+
+    private:
+
+        const char *cmd_line;
+
+    };
 
     /**
-     * TODO Impl iterator?
      *
      * Non-injective mapping distinguished with the std::multimap
      *
