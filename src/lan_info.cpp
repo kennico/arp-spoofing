@@ -20,9 +20,12 @@ namespace kni {
         KNI_LOG_DEBUG("%s - command: %s", __FUNCTION__, script);
 
         int ipn = 0;
+        char ipc[3 * 4 + 3 + 1];
         return command(script).read_line([&](const char *line, ssize_t len) -> bool {
-            if (ipn == 0)
-                return inet_pton(AF_INET, line, &ipn) == 1;
+            if (ipn == 0) {
+                strncpy(ipc, line, static_cast<size_t>(len - 1));
+                return inet_pton(AF_INET, ipc, &ipn) == 1;
+            }
 
             mac_t mac;
             if (mac_pton(line, &mac) == 0)
